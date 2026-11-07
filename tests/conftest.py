@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path
 import struct
+import sys
 from typing import Dict, List, Optional, Tuple
 import zipfile
 import pytest
+
+# Ensure src/ is on sys.path for direct pytest invocation without pip install
+_SRC_PATH = str(Path(__file__).resolve().parent.parent / "src")
+if _SRC_PATH not in sys.path:
+    sys.path.insert(0, _SRC_PATH)
 
 from pureapk.apk import APK
 from pureapk.builder import APKBuilder

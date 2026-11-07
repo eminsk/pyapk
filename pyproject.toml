@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pureapk"
+version = "0.1.0"
+description = "High-performance pure Python APK inspection and packaging toolkit with zero dependencies."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "eminsk", email = "M_N_N@tut.by" }
+]
+requires-python = ">=3.8"
+dependencies = []
+
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Programming Language :: Python :: 3.16",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://github.com/eminsk/pureapk"
+Repository = "https://github.com/eminsk/pureapk.git"
+Issues = "https://github.com/eminsk/pureapk/issues"
+
+[project.scripts]
+pureapk = "pureapk.cli:main"
+pyapk = "pureapk.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pureapk", "src/pyapk"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --strict-markers"

@@ -140,6 +140,24 @@ android.permissions = INTERNET
         if not spec.exists():
             spec.write_text(KivyAppHelper.generate_buildozer_spec(title=title), encoding="utf-8")
 
+    @staticmethod
+    def pack_app(
+        source_dir: Union[str, Path],
+        output_apk: Union[str, Path],
+        package_name: str = "org.kivy.app",
+        app_title: str = "Kivy App",
+    ) -> None:
+        """Packs a Kivy project directory into a standard Android APK."""
+        from pureapk.builder import APKBuilder
+        src = Path(source_dir)
+        builder = APKBuilder(output_apk)
+        manifest_path = src / "AndroidManifest.xml"
+        if not manifest_path.exists():
+            manifest_bytes = KivyAppHelper.generate_manifest_xml(package_name, app_title).encode("utf-8")
+            builder.add_bytes("AndroidManifest.xml", manifest_bytes)
+        builder.add_directory(src)
+        builder.build()
+
 
 class PygameAppHelper:
     """Helper utilities and template generators for Pygame Android applications."""
@@ -235,3 +253,21 @@ android.permissions = INTERNET,VIBRATE
         spec = path / "buildozer.spec"
         if not spec.exists():
             spec.write_text(PygameAppHelper.generate_buildozer_spec(title=title), encoding="utf-8")
+
+    @staticmethod
+    def pack_app(
+        source_dir: Union[str, Path],
+        output_apk: Union[str, Path],
+        package_name: str = "org.pygame.app",
+        app_title: str = "Pygame App",
+    ) -> None:
+        """Packs a Pygame project directory into a standard Android APK."""
+        from pureapk.builder import APKBuilder
+        src = Path(source_dir)
+        builder = APKBuilder(output_apk)
+        manifest_path = src / "AndroidManifest.xml"
+        if not manifest_path.exists():
+            manifest_bytes = PygameAppHelper.generate_manifest_xml(package_name, app_title).encode("utf-8")
+            builder.add_bytes("AndroidManifest.xml", manifest_bytes)
+        builder.add_directory(src)
+        builder.build()

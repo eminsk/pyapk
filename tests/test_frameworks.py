@@ -97,3 +97,43 @@ def test_cli_init_kivy_and_pygame(tmp_path: Path) -> None:
     code_p = main(["init-pygame", p_dir, "--title", "CLI Pygame"])
     assert code_p == 0
     assert (tmp_path / "cli_pygame" / "buildozer.spec").exists()
+
+
+def test_pack_kivy_and_pygame(tmp_path: Path) -> None:
+    k_dir = tmp_path / "kivy_pack_src"
+    p_dir = tmp_path / "pygame_pack_src"
+    KivyAppHelper.init_project(k_dir, title="PackKivy")
+    PygameAppHelper.init_project(p_dir, title="PackPygame")
+
+    k_apk = tmp_path / "kivy_out.apk"
+    p_apk = tmp_path / "pygame_out.apk"
+
+    KivyAppHelper.pack_app(k_dir, k_apk, app_title="PackKivy")
+    assert k_apk.exists()
+    with APK(k_apk) as apk:
+        assert "main.py" in apk.filenames
+        assert "AndroidManifest.xml" in apk.filenames
+
+    PygameAppHelper.pack_app(p_dir, p_apk, app_title="PackPygame")
+    assert p_apk.exists()
+    with APK(p_apk) as apk:
+        assert "main.py" in apk.filenames
+        assert "AndroidManifest.xml" in apk.filenames
+
+
+def test_cli_pack_kivy_and_pygame(tmp_path: Path) -> None:
+    k_dir = tmp_path / "cli_k_src"
+    p_dir = tmp_path / "cli_p_src"
+    KivyAppHelper.init_project(k_dir)
+    PygameAppHelper.init_project(p_dir)
+
+    k_apk = str(tmp_path / "cli_k.apk")
+    p_apk = str(tmp_path / "cli_p.apk")
+
+    code_k = main(["pack-kivy", str(k_dir), "-o", k_apk, "--title", "KivyCLI"])
+    assert code_k == 0
+    assert Path(k_apk).exists()
+
+    code_p = main(["pack-pygame", str(p_dir), "-o", p_apk, "--title", "PygameCLI"])
+    assert code_p == 0
+    assert Path(p_apk).exists()

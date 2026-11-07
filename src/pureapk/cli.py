@@ -149,6 +149,20 @@ def cmd_init_pygame(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pack_kivy(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import KivyAppHelper
+    KivyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title)
+    print(f"Successfully packaged Kivy APK: {args.output}")
+    return 0
+
+
+def cmd_pack_pygame(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import PygameAppHelper
+    PygameAppHelper.pack_app(args.source_dir, args.output, app_title=args.title)
+    print(f"Successfully packaged Pygame APK: {args.output}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pureapk",
@@ -208,6 +222,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_pygame.add_argument("target_dir", help="Target project folder")
     p_pygame.add_argument("--title", default="Pygame App", help="App title")
 
+    # pack-kivy
+    p_pack_kivy = subparsers.add_parser("pack-kivy", help="Pack a Kivy project directory into an APK")
+    p_pack_kivy.add_argument("source_dir", help="Kivy project folder")
+    p_pack_kivy.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_kivy.add_argument("--title", default="Kivy App", help="App title")
+
+    # pack-pygame
+    p_pack_pygame = subparsers.add_parser("pack-pygame", help="Pack a Pygame project directory into an APK")
+    p_pack_pygame.add_argument("source_dir", help="Pygame project folder")
+    p_pack_pygame.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_pygame.add_argument("--title", default="Pygame App", help="App title")
+
     return parser
 
 
@@ -217,7 +243,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Fallback to info command if first argument is a file ending in .apk
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in [
-        "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack", "init-kivy", "init-pygame"
+        "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
+        "init-kivy", "init-pygame", "pack-kivy", "pack-pygame"
     ])
     is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
 
@@ -243,6 +270,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "pack": cmd_pack,
         "init-kivy": cmd_init_kivy,
         "init-pygame": cmd_init_pygame,
+        "pack-kivy": cmd_pack_kivy,
+        "pack-pygame": cmd_pack_pygame,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

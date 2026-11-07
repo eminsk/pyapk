@@ -10,6 +10,7 @@ from __future__ import annotations
 from pureapk.apk import APK, APKFileInfo
 from pureapk.builder import APKBuilder, pack
 from pureapk.dex import DexHeader, MultiDexSummary
+from pureapk.frameworks import FrameworkDetector, KivyAppHelper, PygameAppHelper
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
 from pureapk.signature import APKCertificate, APKSignature
 
@@ -27,6 +28,9 @@ __all__ = [
     "AxmlAttribute",
     "APKSignature",
     "APKCertificate",
+    "FrameworkDetector",
+    "KivyAppHelper",
+    "PygameAppHelper",
     "load",
     "inspect",
     "__version__",

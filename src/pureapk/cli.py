@@ -36,6 +36,8 @@ def _format_info_human(apk: APK, data: Dict[str, Any]) -> None:
     print(f"Min SDK:        {data['min_sdk_version']}")
     print(f"Target SDK:     {data['target_sdk_version']}")
     print(f"App Label:      {data['application_label']}")
+    print(f"Framework:      {data.get('framework', 'native').capitalize()}")
+    print(f"Is Python App:  {data.get('is_python_app', False)}")
     print(f"Total Files:    {data['total_files']}")
     print(f"Architectures:  {', '.join(data['native_architectures']) or 'Universal (no native libs)'}")
     print(f"Permissions:    {len(data['permissions'])}")
@@ -133,6 +135,20 @@ def cmd_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_init_kivy(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import KivyAppHelper
+    KivyAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized Kivy project in: {args.target_dir}")
+    return 0
+
+
+def cmd_init_pygame(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import PygameAppHelper
+    PygameAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized Pygame project in: {args.target_dir}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pureapk",
@@ -182,6 +198,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack.add_argument("source_dir", help="Source folder to package")
     p_pack.add_argument("-o", "--output", required=True, help="Output APK filename")
 
+    # init-kivy
+    p_kivy = subparsers.add_parser("init-kivy", help="Scaffold a Kivy Android project")
+    p_kivy.add_argument("target_dir", help="Target project folder")
+    p_kivy.add_argument("--title", default="Kivy App", help="App title")
+
+    # init-pygame
+    p_pygame = subparsers.add_parser("init-pygame", help="Scaffold a Pygame Android project")
+    p_pygame.add_argument("target_dir", help="Target project folder")
+    p_pygame.add_argument("--title", default="Pygame App", help="App title")
+
     return parser
 
 
@@ -191,7 +217,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Fallback to info command if first argument is a file ending in .apk
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in [
-        "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack"
+        "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack", "init-kivy", "init-pygame"
     ])
     is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
 
@@ -215,6 +241,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "verify": cmd_verify,
         "extract": cmd_extract,
         "pack": cmd_pack,
+        "init-kivy": cmd_init_kivy,
+        "init-pygame": cmd_init_pygame,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

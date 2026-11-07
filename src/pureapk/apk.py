@@ -292,6 +292,15 @@ class APK:
         target.mkdir(parents=True, exist_ok=True)
         self.zip_file.extractall(target, members=members)
 
+    @property
+    def framework(self) -> str:
+        from pureapk.frameworks import FrameworkDetector
+        return FrameworkDetector.detect(self.filenames, self.activities)
+
+    @property
+    def is_python_app(self) -> bool:
+        return self.framework in ("kivy", "pygame", "python")
+
     def verify(self) -> Dict[str, Any]:
         """Validates internal CRC checksums and returns integrity status."""
         bad_file = self.zip_file.testzip()
@@ -313,6 +322,8 @@ class APK:
             "target_sdk_version": self.target_sdk_version,
             "application_label": self.application_label,
             "application_icon": self.application_icon,
+            "framework": self.framework,
+            "is_python_app": self.is_python_app,
             "permissions": list(self.permissions),
             "activities": list(self.activities),
             "services": list(self.services),

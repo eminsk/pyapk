@@ -1,0 +1,22 @@
+Source: python-pureapk
+Section: python
+Priority: optional
+Maintainer: eminsk <M_N_N@tut.by>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               pybuild-plugin-pyproject,
+               python3-all,
+               python3-hatchling
+Standards-Version: 4.6.2
+Homepage: https://github.com/eminsk/pyapk
+
+Package: python3-pureapk
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends}
+Description: Pure Python Android APK Engine, Multi-Store Packager & Toolchain
+ Ultra-fast zero-dependency Android APK engine, decoder, and multi-store packager
+ written in pure Python. Provides zero-copy memoryview parsing for binary
+ AndroidManifest.xml and DEX headers, with first-class scaffolding and packaging
+ toolchains for Kivy, Pygame, Flet, BeeWare (Toga), Ren'Py, and WebView apps,
+ plus store bundles for Google Play (.aab), Apple (.ipa), and Windows Store (.msix).

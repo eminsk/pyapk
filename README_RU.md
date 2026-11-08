@@ -7,14 +7,16 @@
 
 [ 🇬🇧 English Documentation ](README.md) | [ 🇷🇺 Документация на русском ]
 
-[![Версия релиза](https://img.shields.io/badge/релиз-v0.1.0-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.0)
-[![Версия PyPI](https://img.shields.io/pypi/v/pureapk.svg?style=flat&logo=pypi&color=blue)](https://pypi.org/project/pureapk/)
+[![Версия релиза](https://img.shields.io/badge/релиз-v0.1.1-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.1)
+[![Версия PyPI](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
+[![Скачивания PyPI](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
+[![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
 [![Версии Python](https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white)](https://pypi.org/project/pureapk/)
 [![Free-Threaded No-GIL](https://img.shields.io/badge/No--GIL-3.13t%20--%203.16t-brightgreen?style=flat)](https://peps.python.org/pep-0703/)
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Ноль зависимостей](https://img.shields.io/badge/зависимости-0%20внешних-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Платформы](https://img.shields.io/badge/платформы-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Тесты](https://img.shields.io/badge/тесты-47%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Тесты](https://img.shields.io/badge/тесты-49%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Матрица](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![Лицензия: MIT](https://img.shields.io/badge/Лицензия-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -79,7 +81,19 @@ uv add pureapk
 
 ### Установка готового универсального колеса прямо из GitHub Releases
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v0.1.0/pureapk-0.1.0-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v0.1.1/pureapk-0.1.1-py3-none-any.whl
+```
+
+### Установка в Ubuntu / Debian через официальный репозиторий APT (PPA)
+```bash
+# Подключение репозитория eminsk PPA
+curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash
+
+# Установка пакета pureapk
+sudo apt install python3-pureapk
+
+# Либо установка готового пакета .deb напрямую
+sudo dpkg -i python3-pureapk_0.1.1-1_all.deb
 ```
 
 ---
@@ -152,15 +166,24 @@ with APK("application.apk") as apk:
 | **BeeWare (Toga)** | Нативные системные виджеты ОС (`android.widget.*`, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
 | **Ren'Py** | Визуальные новеллы, текстовые квесты и сюжетные игры | `RenPyAppHelper` | Android APK, Google Play AAB |
 | **WebView Apps** | HTML5/CSS/Tailwind UI + локальный Python бэкенд | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **PySide6 / PyQt** | Классический десктопный GUI на Qt и сложные графические системы | `MSIXBuilder` | Windows MSIX (Microsoft Store) |
 
 ```bash
-# Инициализация структуры проекта
+# Инициализация структуры мобильных и десктопных проектов
 pureapk init-kivy my_kivy_app --title "Моё Kivy Приложение"
 pureapk init-pygame my_pygame_app --title "Space Shooter"
+pureapk init-flet my_flet_app --title "Flet Mobile App"
+pureapk init-toga my_toga_app --title "BeeWare Native App"
+pureapk init-renpy my_novel --title "Интерактивная Новелла"
+pureapk init-webview my_web_app --title "HTML5 Гибридное Приложение"
 
 # Мгновенная упаковка в APK (для теста или релизный режим для сторов)
 pureapk pack-kivy my_kivy_app -o app.apk --release
 pureapk pack-pygame my_pygame_app -o shooter.apk --release
+pureapk pack-flet my_flet_app -o flet.apk --release
+pureapk pack-toga my_toga_app -o toga.apk --release
+pureapk pack-renpy my_novel -o novel.apk --release
+pureapk pack-webview my_web_app -o webview.apk --release
 ```
 
 ---

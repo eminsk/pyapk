@@ -1,0 +1,15 @@
+python-pureapk (0.1.1-1) unstable; urgency=medium
+
+  * Release version 0.1.1: Complete zero-dependency pure Python Android APK engine.
+  * Added first-class toolchain support for Kivy, Pygame, Flet, BeeWare (Toga), Ren'Py, and WebView.
+  * Added multi-store release builders: Google Play (.aab), Apple App Store (.ipa), Microsoft Store (.msix).
+  * Added generate-keystore subcommand for production release signing.
+  * 100% test pass rate across 54 GitHub Actions CI matrix environments.
+
+ -- eminsk <M_N_N@tut.by>  Sun, 08 Nov 2026 09:00:00 +0000
+
+python-pureapk (0.1.0-1) unstable; urgency=medium
+
+  * Initial release of pureapk / pyapk.
+
+ -- eminsk <M_N_N@tut.by>  Sat, 07 Nov 2026 12:00:00 +0000

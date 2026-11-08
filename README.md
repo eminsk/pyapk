@@ -7,14 +7,16 @@
 
 [ 🇬🇧 English ] | [ 🇷🇺 Документация на русском ](README_RU.md)
 
-[![Release Version](https://img.shields.io/badge/release-v0.1.0-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.0)
-[![PyPI Version](https://img.shields.io/pypi/v/pureapk.svg?style=flat&logo=pypi&color=blue)](https://pypi.org/project/pureapk/)
+[![Release Version](https://img.shields.io/badge/release-v0.1.1-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.1)
+[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
+[![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
 [![Python Versions](https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white)](https://pypi.org/project/pureapk/)
 [![Free-Threaded No-GIL](https://img.shields.io/badge/No--GIL-3.13t%20--%203.16t-brightgreen?style=flat)](https://peps.python.org/pep-0703/)
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-47%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-49%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -80,6 +82,18 @@ uv add pureapk
 ### Install Pre-Built Universal Wheel Directly from GitHub
 ```bash
 pip install https://github.com/eminsk/pyapk/releases/download/v0.1.1/pureapk-0.1.1-py3-none-any.whl
+```
+
+### Ubuntu / Debian (Official APT PPA)
+```bash
+# Set up eminsk APT repository
+curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash
+
+# Install pureapk
+sudo apt install python3-pureapk
+
+# Or install standalone .deb package directly
+sudo dpkg -i python3-pureapk_0.1.1-1_all.deb
 ```
 
 ---
@@ -152,15 +166,24 @@ with APK("application.apk") as apk:
 | **BeeWare (Toga)** | Native system widgets (`android.widget.*`, UIKit, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
 | **Ren'Py** | Visual novels, branching interactive fiction & story games | `RenPyAppHelper` | Android APK, Google Play AAB |
 | **WebView Apps** | HTML5/CSS/Tailwind UI + lightweight Python local backend | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **PySide6 / PyQt** | Qt-based desktop GUI & advanced graphics suites | `MSIXBuilder` | Windows MSIX (Microsoft Store) |
 
 ```bash
-# Scaffold a new mobile project
+# Scaffold mobile & desktop projects
 pureapk init-kivy my_kivy_app --title "Kivy Mobile App"
 pureapk init-pygame my_pygame_app --title "Space Shooter"
+pureapk init-flet my_flet_app --title "Flet Mobile App"
+pureapk init-toga my_toga_app --title "BeeWare Native App"
+pureapk init-renpy my_novel --title "Interactive Story"
+pureapk init-webview my_web_app --title "HTML5 Hybrid App"
 
 # Package directly into APK (Debug or Store-Ready Release)
 pureapk pack-kivy my_kivy_app -o app.apk --release
 pureapk pack-pygame my_pygame_app -o shooter.apk --release
+pureapk pack-flet my_flet_app -o flet.apk --release
+pureapk pack-toga my_toga_app -o toga.apk --release
+pureapk pack-renpy my_novel -o novel.apk --release
+pureapk pack-webview my_web_app -o webview.apk --release
 ```
 
 ---

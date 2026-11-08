@@ -9,6 +9,7 @@
 
 [![Release Version](https://img.shields.io/badge/release-v0.1.1-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.1)
 [![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
+[![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
 [![Python Versions](https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white)](https://pypi.org/project/pureapk/)
@@ -94,6 +95,16 @@ sudo apt install python3-pureapk
 
 # Or install standalone .deb package directly
 sudo dpkg -i python3-pureapk_0.1.1-1_all.deb
+```
+
+### Conda / Mamba / Pixi (Anaconda.org)
+```bash
+# Install via conda from personal channel
+conda install -c m_n_nik pureapk
+
+# Or using mamba / pixi
+mamba install -c m_n_nik pureapk
+pixi add --channel m_n_nik pureapk
 ```
 
 ---

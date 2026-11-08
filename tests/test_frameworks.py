@@ -137,3 +137,39 @@ def test_cli_pack_kivy_and_pygame(tmp_path: Path) -> None:
     code_p = main(["pack-pygame", str(p_dir), "-o", p_apk, "--title", "PygameCLI"])
     assert code_p == 0
     assert Path(p_apk).exists()
+
+
+def test_flet_toga_renpy_webview_helpers(tmp_path: Path) -> None:
+    from pureapk.frameworks import FletAppHelper, TogaAppHelper, RenPyAppHelper, WebViewAppHelper
+
+    # Flet
+    f_dir = tmp_path / "flet_proj"
+    f_apk = tmp_path / "flet.apk"
+    FletAppHelper.init_project(f_dir, title="MyFlet")
+    assert (f_dir / "main.py").exists()
+    FletAppHelper.pack_app(f_dir, f_apk, app_title="MyFlet", release=True)
+    assert f_apk.exists()
+
+    # Toga
+    t_dir = tmp_path / "toga_proj"
+    t_apk = tmp_path / "toga.apk"
+    TogaAppHelper.init_project(t_dir, title="MyToga")
+    assert (t_dir / "app.py").exists()
+    TogaAppHelper.pack_app(t_dir, t_apk, app_title="MyToga", release=True)
+    assert t_apk.exists()
+
+    # Ren'Py
+    r_dir = tmp_path / "renpy_proj"
+    r_apk = tmp_path / "renpy.apk"
+    RenPyAppHelper.init_project(r_dir, title="MyNovel")
+    assert (r_dir / "game" / "script.rpy").exists()
+    RenPyAppHelper.pack_app(r_dir, r_apk, app_title="MyNovel", release=True)
+    assert r_apk.exists()
+
+    # WebView
+    w_dir = tmp_path / "web_proj"
+    w_apk = tmp_path / "webview.apk"
+    WebViewAppHelper.init_project(w_dir, title="MyWeb")
+    assert (w_dir / "assets" / "index.html").exists()
+    WebViewAppHelper.pack_app(w_dir, w_apk, app_title="MyWeb", release=True)
+    assert w_apk.exists()

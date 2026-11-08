@@ -133,12 +133,21 @@ with APK("application.apk") as apk:
 
 ---
 
-## 🎮 Поддержка Kivy и Pygame без лишней обвязки
+## 🎮 Поддерживаемые Python GUI и игровые фреймворки
 
-Упаковывайте приложения Kivy и Pygame в готовые APK-файлы на **любой операционной системе** (включая Windows 7/10/11, macOS, Linux) и **на любой версии Python** без необходимости настраивать виртуальные машины с Linux:
+`pureapk` предоставляет готовую шаблонизацию проектов, синтез манифестов и прямую упаковку для всех ключевых Python-фреймворков на **любой операционной системе** (включая Windows 7/10/11, macOS, Linux) без необходимости ставить Android Studio:
+
+| Фреймворк | Назначение и архитектура | Вспомогательный класс | Поддерживаемые форматы |
+| :--- | :--- | :--- | :--- |
+| **Kivy** | Сенсорный интерфейс, мобильные бизнес-клиенты, дашборды | `KivyAppHelper` | Android APK, Google Play AAB |
+| **Pygame** | 2D аркады, физические симуляции, ретро-игры | `PygameAppHelper` | Android APK, Google Play AAB |
+| **Flet** | Современный UI на Flutter (Material 3 / Cupertino) | `FletAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **BeeWare (Toga)** | Нативные системные виджеты ОС (`android.widget.*`, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **Ren'Py** | Визуальные новеллы, текстовые квесты и сюжетные игры | `RenPyAppHelper` | Android APK, Google Play AAB |
+| **WebView Apps** | HTML5/CSS/Tailwind UI + локальный Python бэкенд | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
 
 ```bash
-# Инициализация структуры мобильного проекта Kivy или Pygame
+# Инициализация структуры проекта
 pureapk init-kivy my_kivy_app --title "Моё Kivy Приложение"
 pureapk init-pygame my_pygame_app --title "Space Shooter"
 

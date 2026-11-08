@@ -133,12 +133,21 @@ with APK("application.apk") as apk:
 
 ---
 
-## 🎮 First-Class Kivy & Pygame Toolchains
+## 🎮 Supported Python GUI & Game Frameworks
 
-Package Kivy and Pygame applications into Android APKs on **any operating system** (Windows 7/10/11, macOS, Linux) and **any Python version** without needing Linux VMs or 15 GB Android SDKs:
+`pureapk` provides first-class project scaffolding, manifest synthesis, and packaging for all major Python UI and game engines on **any operating system** (Windows 7/10/11, macOS, Linux) without needing Android Studio:
+
+| Framework | Architecture & Use Case | Helper Class | Supported Targets |
+| :--- | :--- | :--- | :--- |
+| **Kivy** | Touch-friendly UI, business applications, custom widgets | `KivyAppHelper` | Android APK, Google Play AAB |
+| **Pygame** | 2D arcade games, simulations, retro titles | `PygameAppHelper` | Android APK, Google Play AAB |
+| **Flet** | Flutter-powered Material 3 / Cupertino cross-platform UI | `FletAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **BeeWare (Toga)** | Native system widgets (`android.widget.*`, UIKit, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **Ren'Py** | Visual novels, branching interactive fiction & story games | `RenPyAppHelper` | Android APK, Google Play AAB |
+| **WebView Apps** | HTML5/CSS/Tailwind UI + lightweight Python local backend | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
 
 ```bash
-# Scaffold a new Kivy or Pygame mobile project
+# Scaffold a new mobile project
 pureapk init-kivy my_kivy_app --title "Kivy Mobile App"
 pureapk init-pygame my_pygame_app --title "Space Shooter"
 

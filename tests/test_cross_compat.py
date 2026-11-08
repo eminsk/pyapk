@@ -9,6 +9,15 @@ import pytest
 
 from pureapk.apk import APK, APKFileInfo
 from pureapk.dex import DexHeader, MultiDexSummary
+from pureapk.frameworks import (
+    FletAppHelper,
+    FrameworkDetector,
+    KivyAppHelper,
+    PygameAppHelper,
+    RenPyAppHelper,
+    TogaAppHelper,
+    WebViewAppHelper,
+)
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
 from pureapk.signature import APKCertificate, APKSignature
 from pureapk.stores import (
@@ -33,6 +42,13 @@ def test_classes_have_slots_and_no_dict() -> None:
         AxmlElement,
         APKCertificate,
         APKSignature,
+        FrameworkDetector,
+        KivyAppHelper,
+        PygameAppHelper,
+        FletAppHelper,
+        TogaAppHelper,
+        RenPyAppHelper,
+        WebViewAppHelper,
         AABBuilder,
         IPABuilder,
         MSIXBuilder,

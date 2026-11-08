@@ -163,6 +163,62 @@ def cmd_pack_pygame(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_init_flet(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import FletAppHelper
+    FletAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized Flet project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_flet(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import FletAppHelper
+    FletAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged Flet APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
+    return 0
+
+
+def cmd_init_toga(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import TogaAppHelper
+    TogaAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized BeeWare Toga project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_toga(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import TogaAppHelper
+    TogaAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged BeeWare Toga APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
+    return 0
+
+
+def cmd_init_renpy(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import RenPyAppHelper
+    RenPyAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized Ren'Py project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_renpy(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import RenPyAppHelper
+    RenPyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged Ren'Py APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
+    return 0
+
+
+def cmd_init_webview(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import WebViewAppHelper
+    WebViewAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized WebView project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_webview(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import WebViewAppHelper
+    WebViewAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged WebView APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
+    return 0
+
+
 def cmd_pack_aab(args: argparse.Namespace) -> int:
     from pureapk.stores import AABBuilder
     builder = AABBuilder(args.output)
@@ -230,7 +286,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pureapk",
         description="High-performance pure Python APK inspection and packaging toolkit.",
     )
-    parser.add_argument("-V", "--version", action="version", version="pureapk 0.1.0")
+    parser.add_argument("-V", "--version", action="version", version="pureapk 0.1.1")
 
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
@@ -298,6 +354,54 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_pygame.add_argument("--title", default="Pygame App", help="App title")
     p_pack_pygame.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
 
+    # init-flet
+    p_init_flet = subparsers.add_parser("init-flet", help="Scaffold a Flet (Flutter/Python) mobile project")
+    p_init_flet.add_argument("target_dir", help="Target project folder")
+    p_init_flet.add_argument("--title", default="Flet App", help="App title")
+
+    # pack-flet
+    p_pack_flet = subparsers.add_parser("pack-flet", help="Pack a Flet project directory into an APK")
+    p_pack_flet.add_argument("source_dir", help="Flet project folder")
+    p_pack_flet.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_flet.add_argument("--title", default="Flet App", help="App title")
+    p_pack_flet.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
+    # init-toga
+    p_init_toga = subparsers.add_parser("init-toga", help="Scaffold a BeeWare Toga (native UI) mobile project")
+    p_init_toga.add_argument("target_dir", help="Target project folder")
+    p_init_toga.add_argument("--title", default="Toga App", help="App title")
+
+    # pack-toga
+    p_pack_toga = subparsers.add_parser("pack-toga", help="Pack a BeeWare Toga project directory into an APK")
+    p_pack_toga.add_argument("source_dir", help="BeeWare Toga project folder")
+    p_pack_toga.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_toga.add_argument("--title", default="Toga App", help="App title")
+    p_pack_toga.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
+    # init-renpy
+    p_init_renpy = subparsers.add_parser("init-renpy", help="Scaffold a Ren'Py visual novel project")
+    p_init_renpy.add_argument("target_dir", help="Target project folder")
+    p_init_renpy.add_argument("--title", default="Visual Novel", help="App title")
+
+    # pack-renpy
+    p_pack_renpy = subparsers.add_parser("pack-renpy", help="Pack a Ren'Py visual novel project into an APK")
+    p_pack_renpy.add_argument("source_dir", help="Ren'Py project folder")
+    p_pack_renpy.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_renpy.add_argument("--title", default="Visual Novel", help="App title")
+    p_pack_renpy.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
+    # init-webview
+    p_init_web = subparsers.add_parser("init-webview", help="Scaffold a lightweight HTML5/CSS WebView project")
+    p_init_web.add_argument("target_dir", help="Target project folder")
+    p_init_web.add_argument("--title", default="WebView App", help="App title")
+
+    # pack-webview
+    p_pack_web = subparsers.add_parser("pack-webview", help="Pack a WebView project directory into an APK")
+    p_pack_web.add_argument("source_dir", help="WebView project folder")
+    p_pack_web.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_web.add_argument("--title", default="WebView App", help="App title")
+    p_pack_web.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
     # pack-aab (Google Play Console)
     p_pack_aab = subparsers.add_parser("pack-aab", help="Build Google Play Android App Bundle (.aab)")
     p_pack_aab.add_argument("source_dir", help="Source folder containing project / base assets")
@@ -344,6 +448,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     known_commands = {
         "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
+        "init-flet", "pack-flet", "init-toga", "pack-toga",
+        "init-renpy", "pack-renpy", "init-webview", "pack-webview",
         "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore",
     }
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
@@ -373,6 +479,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-pygame": cmd_init_pygame,
         "pack-kivy": cmd_pack_kivy,
         "pack-pygame": cmd_pack_pygame,
+        "init-flet": cmd_init_flet,
+        "pack-flet": cmd_pack_flet,
+        "init-toga": cmd_init_toga,
+        "pack-toga": cmd_pack_toga,
+        "init-renpy": cmd_init_renpy,
+        "pack-renpy": cmd_pack_renpy,
+        "init-webview": cmd_init_webview,
+        "pack-webview": cmd_pack_webview,
         "pack-aab": cmd_pack_aab,
         "init-ios": cmd_init_ios,
         "pack-ipa": cmd_pack_ipa,

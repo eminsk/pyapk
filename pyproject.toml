@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pureapk"
-version = "0.1.0"
-description = "High-performance pure Python APK inspection and packaging toolkit with zero dependencies."
+version = "0.1.1"
+description = "High-performance pure Python APK inspection, multi-store packager, and framework toolchain with zero dependencies."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
@@ -42,6 +42,16 @@ classifiers = [
 dev = [
     "pytest>=7.0.0",
     "pytest-cov",
+]
+kivy = ["kivy>=2.2.0"]
+pygame = ["pygame-ce>=2.4.0"]
+flet = ["flet>=0.21.0"]
+toga = ["toga>=0.4.0"]
+all = [
+    "kivy>=2.2.0",
+    "pygame-ce>=2.4.0",
+    "flet>=0.21.0",
+    "toga>=0.4.0",
 ]
 
 [project.urls]

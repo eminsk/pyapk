@@ -95,4 +95,38 @@ def test_cli_direct_apk_argument(sample_apk_file: str, capsys: pytest.CaptureFix
 def test_cli_pyapk_entrypoint() -> None:
     import pyapk
     assert pyapk.APK is not None
-    assert pyapk.__version__ == "0.1.0"
+    assert pyapk.__version__ == "0.1.1"
+
+
+def test_cli_framework_subcommands(tmp_path: Path) -> None:
+    # 1. flet
+    f_dir = tmp_path / "cli_flet"
+    f_apk = tmp_path / "flet.apk"
+    assert main(["init-flet", str(f_dir), "--title", "FletCLI"]) == 0
+    assert (f_dir / "main.py").exists()
+    assert main(["pack-flet", str(f_dir), "-o", str(f_apk), "--title", "FletCLI", "--release"]) == 0
+    assert f_apk.exists()
+
+    # 2. toga
+    t_dir = tmp_path / "cli_toga"
+    t_apk = tmp_path / "toga.apk"
+    assert main(["init-toga", str(t_dir), "--title", "TogaCLI"]) == 0
+    assert (t_dir / "app.py").exists()
+    assert main(["pack-toga", str(t_dir), "-o", str(t_apk), "--title", "TogaCLI", "--release"]) == 0
+    assert t_apk.exists()
+
+    # 3. renpy
+    r_dir = tmp_path / "cli_renpy"
+    r_apk = tmp_path / "renpy.apk"
+    assert main(["init-renpy", str(r_dir), "--title", "RenPyCLI"]) == 0
+    assert (r_dir / "game" / "script.rpy").exists()
+    assert main(["pack-renpy", str(r_dir), "-o", str(r_apk), "--title", "RenPyCLI", "--release"]) == 0
+    assert r_apk.exists()
+
+    # 4. webview
+    w_dir = tmp_path / "cli_web"
+    w_apk = tmp_path / "web.apk"
+    assert main(["init-webview", str(w_dir), "--title", "WebCLI"]) == 0
+    assert (w_dir / "assets" / "index.html").exists()
+    assert main(["pack-webview", str(w_dir), "-o", str(w_apk), "--title", "WebCLI", "--release"]) == 0
+    assert w_apk.exists()

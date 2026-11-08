@@ -111,13 +111,13 @@ def test_pack_kivy_and_pygame(tmp_path: Path) -> None:
     KivyAppHelper.pack_app(k_dir, k_apk, app_title="PackKivy")
     assert k_apk.exists()
     with APK(k_apk) as apk:
-        assert "main.py" in apk.filenames
+        assert "assets/private.tar" in apk.filenames
         assert "AndroidManifest.xml" in apk.filenames
 
     PygameAppHelper.pack_app(p_dir, p_apk, app_title="PackPygame")
     assert p_apk.exists()
     with APK(p_apk) as apk:
-        assert "main.py" in apk.filenames
+        assert "assets/private.tar" in apk.filenames
         assert "AndroidManifest.xml" in apk.filenames
 
 

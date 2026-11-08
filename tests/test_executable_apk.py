@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
+import tarfile
 import pytest
 from pureapk.apk import APK
 from pureapk.dex import DexHeader
@@ -20,9 +22,19 @@ def test_kivy_pack_app_produces_fully_runnable_apk(tmp_path: Path) -> None:
     assert output_apk.exists()
 
     with APK(output_apk) as apk:
-        # 1. Contains compiled bytecode and source
-        assert "main.py" in apk.filenames
-        assert "main.pyc" in apk.filenames
+        # 1. Contains bundled assets/private.tar and private.mp3 (p4a standard)
+        assert "assets/private.tar" in apk.filenames
+        assert "assets/private.mp3" in apk.filenames
+        assert "main.py" not in apk.filenames
+        assert "main.pyc" not in apk.filenames
+        assert "buildozer.spec" not in apk.filenames
+
+        # Verify tar content has python code and compiled bytecode
+        tar_bytes = apk.read("assets/private.tar")
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tf:
+            names = tf.getnames()
+            assert any("main.py" in n for n in names)
+            assert any("main.pyc" in n for n in names)
 
         # 2. Contains valid bootstrap DEX
         assert "classes.dex" in apk.filenames
@@ -47,6 +59,26 @@ def test_kivy_pack_app_produces_fully_runnable_apk(tmp_path: Path) -> None:
         assert len(sig.certificates) >= 1
 
 
+def test_kivy_pack_app_with_native_lib(tmp_path: Path) -> None:
+    """Tests packaging when project includes compiled native architecture libraries in lib/."""
+    project_dir = tmp_path / "kivy_native"
+    KivyAppHelper.init_project(project_dir, title="Native Kivy App")
+    lib_dir = project_dir / "lib" / "arm64-v8a"
+    lib_dir.mkdir(parents=True)
+    fake_so = lib_dir / "libpython3.so"
+    fake_so.write_bytes(b"\x7fELF" + b"\x00" * 100)
+
+    output_apk = tmp_path / "native_kivy.apk"
+    KivyAppHelper.pack_app(project_dir, output_apk)
+
+    with APK(output_apk) as apk:
+        assert "lib/arm64-v8a/libpython3.so" in apk.filenames
+        assert "assets/private.tar" in apk.filenames
+        assert "classes.dex" in apk.filenames
+        assert "AndroidManifest.xml" in apk.filenames
+        assert "main.py" not in apk.filenames
+
+
 def test_pygame_pack_app_produces_fully_runnable_apk(tmp_path: Path) -> None:
     project_dir = tmp_path / "pygame_game"
     PygameAppHelper.init_project(project_dir, title="My Pygame App")
@@ -57,10 +89,11 @@ def test_pygame_pack_app_produces_fully_runnable_apk(tmp_path: Path) -> None:
     assert output_apk.exists()
 
     with APK(output_apk) as apk:
-        assert "main.py" in apk.filenames
-        assert "main.pyc" in apk.filenames
+        assert "assets/private.tar" in apk.filenames
+        assert "assets/private.mp3" in apk.filenames
         assert "classes.dex" in apk.filenames
         assert "AndroidManifest.xml" in apk.filenames
+        assert "main.py" not in apk.filenames
 
         sig = apk.signature
         assert sig.is_signed is True

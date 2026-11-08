@@ -74,6 +74,67 @@ class FrameworkDetector:
         return "native"
 
 
+def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False) -> None:
+    """Packages framework project folders: lib/, res/, assets/, and private python tarballs."""
+    # 1. Native shared libraries (lib/ -> lib/)
+    lib_dir = src / "lib"
+    if lib_dir.is_dir():
+        builder.add_directory(lib_dir, prefix="lib")
+
+    # 2. Android resources (res/ -> res/)
+    res_dir = src / "res"
+    if res_dir.is_dir():
+        builder.add_directory(res_dir, prefix="res")
+
+    # 3. Custom assets (assets/ -> assets/)
+    assets_dir = src / "assets"
+    if assets_dir.is_dir():
+        builder.add_directory(assets_dir, prefix="assets")
+
+    if is_webview:
+        index_html = src / "index.html"
+        if index_html.exists() and not (assets_dir / "index.html").exists():
+            builder.add_file(index_html, "assets/index.html")
+
+    # 4. Bundle Python codebase into assets/private.tar and assets/private.mp3 (p4a standard)
+    import io
+    import tarfile
+    import importlib._bootstrap_external
+
+    tar_buf = io.BytesIO()
+    has_files = False
+    with tarfile.open(fileobj=tar_buf, mode="w") as tf:
+        for root, _, files in os.walk(src):
+            for f in files:
+                full_f = Path(root) / f
+                rel_f = full_f.relative_to(src)
+                rel_parts = rel_f.parts
+                if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__"):
+                    continue
+                if rel_parts[0] in ("AndroidManifest.xml", "buildozer.spec"):
+                    continue
+                rel_str = str(rel_f).replace("\\", "/")
+                tf.add(str(full_f), arcname=rel_str)
+                has_files = True
+
+                # Also include compiled .pyc alongside .py inside private.tar
+                if f.endswith(".py") and not (full_f.parent / f"{f}c").exists():
+                    try:
+                        source_bytes = full_f.read_bytes()
+                        code_obj = compile(source_bytes, f, "exec")
+                        pyc_bytes = importlib._bootstrap_external._code_to_timestamp_pyc(code_obj)
+                        pyc_ti = tarfile.TarInfo(name=f"{rel_str}c")
+                        pyc_ti.size = len(pyc_bytes)
+                        pyc_ti.mtime = int(full_f.stat().st_mtime)
+                        tf.addfile(pyc_ti, io.BytesIO(pyc_bytes))
+                    except Exception:
+                        pass
+    tar_bytes = tar_buf.getvalue()
+    if has_files and tar_bytes:
+        builder.add_bytes("assets/private.tar", tar_bytes, compress=False)
+        builder.add_bytes("assets/private.mp3", tar_bytes, compress=False)
+
+
 class KivyAppHelper:
     """Helper utilities and template generators for Kivy Android applications."""
 
@@ -181,12 +242,15 @@ android.permissions = INTERNET
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = KivyAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src)
         builder.build()
 
 
@@ -306,12 +370,15 @@ android.permissions = INTERNET,VIBRATE
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = PygameAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src)
         builder.build()
 
 
@@ -412,12 +479,15 @@ class FletAppHelper:
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = FletAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src)
         builder.build()
 
 
@@ -504,12 +574,15 @@ class TogaAppHelper:
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = TogaAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src)
         builder.build()
 
 
@@ -591,12 +664,15 @@ class RenPyAppHelper:
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = RenPyAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src)
         builder.build()
 
 
@@ -695,10 +771,13 @@ class WebViewAppHelper:
             compile_py=True,
         )
         manifest_path = src / "AndroidManifest.xml"
-        if not manifest_path.exists():
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
             manifest_str = WebViewAppHelper.generate_manifest_xml(package_name, app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
-        builder.add_directory(src)
+
+        _pack_framework_project(builder, src, is_webview=True)
         builder.build()

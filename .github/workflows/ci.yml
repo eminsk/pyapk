@@ -50,11 +50,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
 
-      - name: Install uv (fallback engine)
-        id: setup-uv
-        uses: astral-sh/setup-uv@v5
-        continue-on-error: true
-
       - name: Run test suite on Python ${{ matrix.python-version }}
         shell: bash
         run: |
@@ -64,11 +59,16 @@ jobs:
             python -m pip install -e . || pip install -e .
             python -m pytest -v --cov=pureapk
           else
-            echo "Running via uv standalone environment"
+            echo "Running via fallback Python / uv standalone environment"
             if ! command -v uv &> /dev/null; then
-              pip install uv || python -m pip install uv || true
+              curl -LsSf https://astral.sh/uv/install.sh | sh || true
+              export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
             fi
-            uv run --python ${{ matrix.python-version }} --with pytest --with pytest-cov pytest -v --cov=pureapk
+            if command -v uv &> /dev/null; then
+              uv run --python ${{ matrix.python-version }} --with pytest --with pytest-cov pytest -v --cov=pureapk
+            else
+              python -m pytest -v --cov=pureapk
+            fi
           fi
 
   build:
@@ -86,15 +86,17 @@ jobs:
 
       - name: Install build tools
         run: |
-          python -m pip install --upgrade pip hatchling build uv || true
+          python -m pip install --upgrade pip hatchling build || true
 
       - name: Build all wheels and sdists
         run: |
-          if command -v uv &> /dev/null; then
-            uv run python scripts/build_all_wheels.py
-          else
-            python scripts/build_all_wheels.py
-          fi
+          python scripts/build_all_wheels.py
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

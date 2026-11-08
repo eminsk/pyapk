@@ -171,12 +171,12 @@ with APK("application.apk") as apk:
 
 | Фреймворк | Назначение и архитектура | Вспомогательный класс | Поддерживаемые форматы |
 | :--- | :--- | :--- | :--- |
-| **Kivy** | Сенсорный интерфейс, мобильные бизнес-клиенты, дашборды | `KivyAppHelper` | Android APK, Google Play AAB |
-| **Pygame** | 2D аркады, физические симуляции, ретро-игры | `PygameAppHelper` | Android APK, Google Play AAB |
-| **Flet** | Современный UI на Flutter (Material 3 / Cupertino) | `FletAppHelper` | Android APK, iOS IPA, Windows MSIX |
-| **BeeWare (Toga)** | Нативные системные виджеты ОС (`android.widget.*`, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
-| **Ren'Py** | Визуальные новеллы, текстовые квесты и сюжетные игры | `RenPyAppHelper` | Android APK, Google Play AAB |
-| **WebView Apps** | HTML5/CSS/Tailwind UI + локальный Python бэкенд | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **Kivy** | Сенсорный интерфейс, мобильные бизнес-клиенты, дашборды | `KivyAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Pygame** | 2D аркады, физические симуляции, ретро-игры | `PygameAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Flet** | Современный UI на Flutter (Material 3 / Cupertino) | `FletAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **BeeWare (Toga)** | Нативные системные виджеты ОС (`android.widget.*`, WinUI) | `TogaAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Ren'Py** | Визуальные новеллы, текстовые квесты и сюжетные игры | `RenPyAppHelper` | Android APK, Google Play AAB, Windows MSIX |
+| **WebView Apps** | HTML5/CSS/Tailwind UI + локальный Python бэкенд | `WebViewAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
 | **PySide6 / PyQt** | Qt for Android и десктопные приложения | `PySideAppHelper` | Android APK, Google Play AAB, Windows MSIX |
 
 ```bash

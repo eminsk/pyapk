@@ -171,12 +171,12 @@ with APK("application.apk") as apk:
 
 | Framework | Architecture & Use Case | Helper Class | Supported Targets |
 | :--- | :--- | :--- | :--- |
-| **Kivy** | Touch-friendly UI, business applications, custom widgets | `KivyAppHelper` | Android APK, Google Play AAB |
-| **Pygame** | 2D arcade games, simulations, retro titles | `PygameAppHelper` | Android APK, Google Play AAB |
-| **Flet** | Flutter-powered Material 3 / Cupertino cross-platform UI | `FletAppHelper` | Android APK, iOS IPA, Windows MSIX |
-| **BeeWare (Toga)** | Native system widgets (`android.widget.*`, UIKit, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
-| **Ren'Py** | Visual novels, branching interactive fiction & story games | `RenPyAppHelper` | Android APK, Google Play AAB |
-| **WebView Apps** | HTML5/CSS/Tailwind UI + lightweight Python local backend | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
+| **Kivy** | Touch-friendly UI, business applications, custom widgets | `KivyAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Pygame** | 2D arcade games, simulations, retro titles | `PygameAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Flet** | Flutter-powered Material 3 / Cupertino cross-platform UI | `FletAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **BeeWare (Toga)** | Native system widgets (`android.widget.*`, UIKit, WinUI) | `TogaAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
+| **Ren'Py** | Visual novels, branching interactive fiction & story games | `RenPyAppHelper` | Android APK, Google Play AAB, Windows MSIX |
+| **WebView Apps** | HTML5/CSS/Tailwind UI + lightweight Python local backend | `WebViewAppHelper` | Android APK, Google Play AAB, iOS IPA, Windows MSIX |
 | **PySide6 / PyQt** | Qt for Android & Windows desktop applications | `PySideAppHelper` | Android APK, Google Play AAB, Windows MSIX |
 
 ```bash

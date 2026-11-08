@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 from pureapk.apk import APK, APKFileInfo
-from pureapk.builder import APKBuilder, pack
+from pureapk.builder import APKBuilder, align_zip_entry, pack, zipalign
+from pureapk.ci import CIHelper
 from pureapk.dex import DexBuilder, DexHeader, MultiDexSummary
 from pureapk.frameworks import (
     FletAppHelper,
@@ -32,6 +33,7 @@ from pureapk.stores import (
     ReleaseHelper,
     WindowsStoreHelper,
 )
+from pureapk.wheels import AndroidWheelHelper
 
 __version__ = "0.1.2"
 __author__ = "eminsk"
@@ -40,6 +42,10 @@ __all__ = [
     "APKFileInfo",
     "APKBuilder",
     "pack",
+    "zipalign",
+    "align_zip_entry",
+    "AndroidWheelHelper",
+    "CIHelper",
     "DexHeader",
     "MultiDexSummary",
     "DexBuilder",

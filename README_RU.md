@@ -17,7 +17,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Ноль зависимостей](https://img.shields.io/badge/зависимости-0%20внешних-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Платформы](https://img.shields.io/badge/платформы-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Тесты](https://img.shields.io/badge/тесты-62%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Тесты](https://img.shields.io/badge/тесты-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Матрица](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![Лицензия: MIT](https://img.shields.io/badge/Лицензия-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -406,6 +406,16 @@ pureapk sign my_app.apk
 
 # Компиляция текстового AndroidManifest.xml в бинарный AXML
 pureapk compile-manifest AndroidManifest.xml -o AndroidManifest.axml
+
+# Проверка и выравнивание по страницам 16 КБ (готовность к Android 15)
+pureapk zipalign -c application.apk
+pureapk zipalign application.apk -o aligned.apk
+
+# Распаковка Android Wheels (.whl -> lib/<abi>/ + модули Python)
+pureapk unpack-wheel package-android_24_arm64_v8a.whl my_app/
+
+# Генерация облачного CI для Cython и Android NDK (сборка без засорения системы)
+pureapk init-ci my_app/ --cython
 
 # Подготовка к магазинам приложений (Google Play AAB, Apple IPA, Windows MSIX)
 pureapk pack-aab project_dir/ -o app.aab

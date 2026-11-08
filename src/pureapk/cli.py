@@ -8,6 +8,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
@@ -29,31 +31,6 @@ def cmd_info(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
-def cmd_install_deps(args: argparse.Namespace) -> int:
-    import shutil
-    import subprocess
-    target_dir = Path(args.project_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    uv_bin = shutil.which("uv")
-    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
-
-    if args.requirements:
-        cmd.extend(["-r", str(args.requirements)])
-    if args.packages:
-        cmd.extend(args.packages)
-
-    if not args.requirements and not args.packages:
-        print("Error: No packages or requirements.txt specified.")
-        return 1
-
-    print(f"Installing dependencies into: {target_dir}...")
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"Successfully installed dependencies into: {target_dir}")
-    return res.returncode
-
-
 
 def _format_info_human(apk: APK, data: Dict[str, Any]) -> None:
     print(f"Package:        {data['package_name']}")
@@ -70,6 +47,7 @@ def _format_info_human(apk: APK, data: Dict[str, Any]) -> None:
     print(f"Activities:     {len(data['activities'])}")
     print(f"DEX Classes:    {data['dex']['total_classes']}")
     print(f"DEX Methods:    {data['dex']['total_methods']}")
+    print(f"16KB Aligned:   {data.get('is_aligned_16k', False)} (Android 15 ready)")
     print(f"Signed:         {data['signature']['is_signed']} ({', '.join(data['signature']['schemes']) or 'none'})")
 
 
@@ -93,31 +71,6 @@ def cmd_permissions(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
-def cmd_install_deps(args: argparse.Namespace) -> int:
-    import shutil
-    import subprocess
-    target_dir = Path(args.project_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    uv_bin = shutil.which("uv")
-    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
-
-    if args.requirements:
-        cmd.extend(["-r", str(args.requirements)])
-    if args.packages:
-        cmd.extend(args.packages)
-
-    if not args.requirements and not args.packages:
-        print("Error: No packages or requirements.txt specified.")
-        return 1
-
-    print(f"Installing dependencies into: {target_dir}...")
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"Successfully installed dependencies into: {target_dir}")
-    return res.returncode
-
-
 
 def cmd_dex(args: argparse.Namespace) -> int:
     with APK(args.apk_path) as apk:
@@ -128,31 +81,6 @@ def cmd_dex(args: argparse.Namespace) -> int:
         }
         output_dispatch[args.json]()
     return 0
-
-def cmd_install_deps(args: argparse.Namespace) -> int:
-    import shutil
-    import subprocess
-    target_dir = Path(args.project_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    uv_bin = shutil.which("uv")
-    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
-
-    if args.requirements:
-        cmd.extend(["-r", str(args.requirements)])
-    if args.packages:
-        cmd.extend(args.packages)
-
-    if not args.requirements and not args.packages:
-        print("Error: No packages or requirements.txt specified.")
-        return 1
-
-    print(f"Installing dependencies into: {target_dir}...")
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"Successfully installed dependencies into: {target_dir}")
-    return res.returncode
-
 
 
 def _format_dex_human(dex_info: Dict[str, Any]) -> None:
@@ -174,31 +102,6 @@ def cmd_files(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
-def cmd_install_deps(args: argparse.Namespace) -> int:
-    import shutil
-    import subprocess
-    target_dir = Path(args.project_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    uv_bin = shutil.which("uv")
-    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
-
-    if args.requirements:
-        cmd.extend(["-r", str(args.requirements)])
-    if args.packages:
-        cmd.extend(args.packages)
-
-    if not args.requirements and not args.packages:
-        print("Error: No packages or requirements.txt specified.")
-        return 1
-
-    print(f"Installing dependencies into: {target_dir}...")
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"Successfully installed dependencies into: {target_dir}")
-    return res.returncode
-
-
 
 def _format_files_human(files: List[Dict[str, Any]]) -> None:
     header = f"{'Size':>10}  {'Compressed':>10}  {'CRC32':>10}  {'Filename'}"
@@ -216,7 +119,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
             False: lambda: print(
                 f"Valid Integrity: {res['is_valid']}\n"
                 f"Corrupted File:  {res['corrupted_file'] or 'None'}\n"
-                f"Signed:          {res['is_signed']} ({', '.join(res['signature_schemes']) or 'none'})"
+                f"Signed:          {res['is_signed']} ({', '.join(res['signature_schemes']) or 'none'})\n"
+                f"16KB Aligned:    {res['so_16k_compliant']} ({'Android 15 ready' if res['so_16k_compliant'] else 'needs zipalign'})\n"
+                f"Fully Aligned:   {res['is_aligned']}"
             ),
         }
         output_dispatch[args.json]()
@@ -258,6 +163,96 @@ def cmd_compile_manifest(args: argparse.Namespace) -> int:
     binary_axml = AxmlEncoder.encode(raw_xml)
     Path(args.output).write_bytes(binary_axml)
     print(f"Successfully compiled manifest to binary AXML ({len(binary_axml)} bytes): {args.output}")
+    return 0
+
+
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
+
+def cmd_zipalign(args: argparse.Namespace) -> int:
+    from pureapk.builder import zipalign
+    if getattr(args, "check", False):
+        with APK(args.input_apk) as apk:
+            res = apk.check_alignment(so_alignment=args.so_align, file_alignment=args.align)
+            output_dispatch = {
+                True: lambda: _print_json(res),
+                False: lambda: _format_zipalign_check_human(res),
+            }
+            output_dispatch[args.json]()
+            return 0 if res["is_aligned"] else 1
+
+    if not args.output:
+        print("Error: -o / --output is required when aligning an APK (use -c / --check to verify only).")
+        return 1
+
+    zipalign(args.input_apk, args.output, alignment=args.align, so_alignment=args.so_align, sign=getattr(args, "sign", False))
+    print(f"Successfully aligned APK (16KB page alignment): {args.output}")
+    return 0
+
+
+def _format_zipalign_check_human(res: Dict[str, Any]) -> None:
+    status = "PASSED (16KB Android 15 ready)" if res["so_16k_compliant"] else "FAILED (unaligned .so files)"
+    print(f"Alignment Verification:  {status}")
+    print(f"Total .so Libraries:     {res['total_so_files']}")
+    print(f"Aligned .so Libraries:   {res['aligned_so_files']}")
+    print(f"Fully Aligned (4B/16KB):  {res['is_aligned']}")
+    if res["unaligned_files"]:
+        print("Unaligned files:")
+        for u in res["unaligned_files"]:
+            print(f"  - {u['filename']}: offset {u['data_offset']} (rem {u['remainder']} for align {u['target_alignment']})")
+
+
+def cmd_unpack_wheel(args: argparse.Namespace) -> int:
+    from pureapk.wheels import AndroidWheelHelper
+    res = AndroidWheelHelper.unpack_wheel(args.wheel_path, args.target_dir, abi=args.abi)
+    output_dispatch = {
+        True: lambda: _print_json(res),
+        False: lambda: (
+            print(f"Successfully unpacked {res['wheel_name']} (ABI: {res['target_abi']}) into: {res['target_dir']}"),
+            print(f"  + Extracted {len(res['extracted_so_files'])} native .so libraries to lib/{res['target_abi']}/"),
+            print(f"  + Extracted {res['extracted_py_files_count']} Python module / resource files"),
+        ),
+    }
+    output_dispatch[args.json]()
+    return 0
+
+
+def cmd_init_ci(args: argparse.Namespace) -> int:
+    from pureapk.ci import CIHelper
+    target_dir = getattr(args, "project_dir", ".") or "."
+    res = CIHelper.generate_cython_workflow(target_dir, generate_scaffold=not getattr(args, "no_scaffold", False))
+    output_dispatch = {
+        True: lambda: _print_json(res),
+        False: lambda: (
+            print(f"Successfully generated GitHub Actions CI workflow for Cython & Android NDK:"),
+            [print(f"  + {path}") for path in res["created_files"]],
+            print("\nCloud CI Features:"),
+            print("  - Automated ARM64 / ARMv7 / x86_64 matrix builds in Ubuntu cloud runners"),
+            print("  - 16KB ELF page alignment (-Wl,-z,max-page-size=16384) for Android 15 compatibility"),
+            print("  - Automated artifact upload for direct packaging with pureapk"),
+        ),
+    }
+    output_dispatch[args.json]()
     return 0
 
 
@@ -344,6 +339,7 @@ def cmd_pack_webview(args: argparse.Namespace) -> int:
     print(f"Successfully packaged WebView APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
+
 def cmd_init_pyside(args: argparse.Namespace) -> int:
     from pureapk.frameworks import PySideAppHelper
     PySideAppHelper.init_project(args.target_dir, title=args.title)
@@ -357,7 +353,6 @@ def cmd_pack_pyside(args: argparse.Namespace) -> int:
     PySideAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged PySide/Qt APK ({rel_mode}): {args.output}")
     return 0
-
 
 
 def cmd_pack_aab(args: argparse.Namespace) -> int:
@@ -421,36 +416,11 @@ def cmd_generate_keystore(args: argparse.Namespace) -> int:
     output_dispatch[args.json]()
     return 0
 
-def cmd_install_deps(args: argparse.Namespace) -> int:
-    import shutil
-    import subprocess
-    target_dir = Path(args.project_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    uv_bin = shutil.which("uv")
-    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
-
-    if args.requirements:
-        cmd.extend(["-r", str(args.requirements)])
-    if args.packages:
-        cmd.extend(args.packages)
-
-    if not args.requirements and not args.packages:
-        print("Error: No packages or requirements.txt specified.")
-        return 1
-
-    print(f"Installing dependencies into: {target_dir}...")
-    res = subprocess.run(cmd)
-    if res.returncode == 0:
-        print(f"Successfully installed dependencies into: {target_dir}")
-    return res.returncode
-
-
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pureapk",
-        description="High-performance pure Python APK inspection and packaging toolkit.",
+        description="High-performance pure Python APK inspection, alignment, and packaging toolkit.",
     )
     parser.add_argument("-V", "--version", action="version", version="pureapk 0.1.2")
 
@@ -482,7 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_files.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # verify
-    p_verify = subparsers.add_parser("verify", help="Verify APK integrity and signatures")
+    p_verify = subparsers.add_parser("verify", help="Verify APK integrity, signatures, and page alignment")
     p_verify.add_argument("apk_path", help="Path to APK file")
     p_verify.add_argument("--json", action="store_true", help="Format output as JSON")
 
@@ -506,10 +476,40 @@ def build_parser() -> argparse.ArgumentParser:
     p_sign.add_argument("-o", "--output", help="Output signed APK path (defaults to in-place)")
     p_sign.add_argument("--alias", default="androiddebugkey", help="Key alias")
 
+    # zipalign
+    p_zipalign = subparsers.add_parser("zipalign", help="Align APK entries to 4-byte and 16KB boundaries for Android 15")
+    p_zipalign.add_argument("input_apk", help="Input APK file")
+    p_zipalign.add_argument("-o", "--output", help="Output aligned APK file")
+    p_zipalign.add_argument("-c", "--check", action="store_true", help="Verify alignment without modifying the archive")
+    p_zipalign.add_argument("--so-align", type=int, default=16384, help="Byte boundary for uncompressed .so libraries (default: 16384)")
+    p_zipalign.add_argument("--align", type=int, default=4, help="Byte boundary for other uncompressed files (default: 4)")
+    p_zipalign.add_argument("--sign", action="store_true", help="Digitally sign APK after alignment")
+    p_zipalign.add_argument("--json", action="store_true", help="Output results as JSON")
+
     # compile-manifest
     p_cman = subparsers.add_parser("compile-manifest", help="Compile text AndroidManifest.xml into binary AXML")
     p_cman.add_argument("input_manifest", help="Input XML file")
     p_cman.add_argument("-o", "--output", required=True, help="Output binary AXML file")
+
+    # install-deps
+    p_inst = subparsers.add_parser("install-deps", aliases=["add-deps"], help="Install pure Python dependencies directly into a project folder")
+    p_inst.add_argument("project_dir", help="Project folder to install dependencies into")
+    p_inst.add_argument("packages", nargs="*", help="Package names to install (e.g. requests urllib3)")
+    p_inst.add_argument("-r", "--requirements", help="Path to requirements.txt file")
+
+    # unpack-wheel / install-wheel
+    p_wheel = subparsers.add_parser("unpack-wheel", aliases=["install-wheel"], help="Unpack an Android wheel (.whl) into lib/<abi>/ and project folders")
+    p_wheel.add_argument("wheel_path", help="Path to .whl package")
+    p_wheel.add_argument("target_dir", help="Project folder to unpack into")
+    p_wheel.add_argument("--abi", help="Target ABI override (e.g. arm64-v8a, armeabi-v7a, x86_64)")
+    p_wheel.add_argument("--json", action="store_true", help="Output results as JSON")
+
+    # init-ci
+    p_ci = subparsers.add_parser("init-ci", help="Generate GitHub Actions CI workflow for cloud Cython/NDK compilation")
+    p_ci.add_argument("project_dir", nargs="?", default=".", help="Target project root directory (default: current directory)")
+    p_ci.add_argument("--cython", action="store_true", default=True, help="Enable Cython build configuration")
+    p_ci.add_argument("--no-scaffold", action="store_true", help="Skip generating sample setup.py and fast_core.pyx")
+    p_ci.add_argument("--json", action="store_true", help="Output results as JSON")
 
     # init-kivy
     p_kivy = subparsers.add_parser("init-kivy", help="Scaffold a Kivy Android project")
@@ -630,12 +630,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_msix.add_argument("source_dir", help="Source directory containing AppxManifest.xml and assets")
     p_pack_msix.add_argument("-o", "--output", required=True, help="Output .msix filename")
 
-    # install-deps
-    p_inst = subparsers.add_parser("install-deps", aliases=["add-deps"], help="Install pure Python dependencies directly into a project folder")
-    p_inst.add_argument("project_dir", help="Project folder to install dependencies into")
-    p_inst.add_argument("packages", nargs="*", help="Package names to install (e.g. requests urllib3)")
-    p_inst.add_argument("-r", "--requirements", help="Path to requirements.txt file")
-
     # generate-keystore
     p_key = subparsers.add_parser("generate-keystore", help="Generate production release signing profile")
     p_key.add_argument("-o", "--output", required=True, help="Output keystore filename")
@@ -653,6 +647,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # Fallback to info command if first argument is a file ending in .apk
     known_commands = {
         "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
+        "zipalign", "unpack-wheel", "install-wheel", "init-ci",
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
         "init-renpy", "pack-renpy", "init-webview", "pack-webview", "init-pyside", "init-pyqt", "pack-pyside", "pack-pyqt",
@@ -681,6 +676,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "verify": cmd_verify,
         "extract": cmd_extract,
         "pack": cmd_pack,
+        "sign": cmd_sign,
+        "zipalign": cmd_zipalign,
+        "compile-manifest": cmd_compile_manifest,
+        "install-deps": cmd_install_deps,
+        "add-deps": cmd_install_deps,
+        "unpack-wheel": cmd_unpack_wheel,
+        "install-wheel": cmd_unpack_wheel,
+        "init-ci": cmd_init_ci,
         "init-kivy": cmd_init_kivy,
         "init-pygame": cmd_init_pygame,
         "pack-kivy": cmd_pack_kivy,
@@ -703,10 +706,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-windows": cmd_init_windows,
         "pack-msix": cmd_pack_msix,
         "generate-keystore": cmd_generate_keystore,
-        "sign": cmd_sign,
-        "compile-manifest": cmd_compile_manifest,
-        "install-deps": cmd_install_deps,
-        "add-deps": cmd_install_deps,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

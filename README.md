@@ -17,7 +17,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-62%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -406,6 +406,16 @@ pureapk sign my_app.apk
 
 # Compile Text AndroidManifest.xml into Binary AXML
 pureapk compile-manifest AndroidManifest.xml -o AndroidManifest.axml
+
+# Android 15 16KB Page Alignment & Verification
+pureapk zipalign -c application.apk
+pureapk zipalign application.apk -o aligned.apk
+
+# Android Precompiled Wheel (.whl) Unpacker (lib/<abi>/ + Python modules)
+pureapk unpack-wheel package-android_24_arm64_v8a.whl my_app/
+
+# Generate Cloud CI for Cython & Android NDK (16KB aligned builds in GitHub Actions)
+pureapk init-ci my_app/ --cython
 
 # Multi-Store Packaging (Google Play AAB, Apple IPA, Microsoft Store MSIX)
 pureapk pack-aab project_dir/ -o app.aab

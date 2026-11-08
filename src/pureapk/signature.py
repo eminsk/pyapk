@@ -201,22 +201,29 @@ class APKSignature:
 
 
 class APKSigner:
-    """Pure Python APK signer supporting v1 (JAR) and v2 (APK Signature Scheme)."""
+    """Pure Python APK signer supporting v1 (JAR) and v2 (APK Signature Scheme) with alignment preservation."""
 
     __slots__ = ()
 
     @classmethod
-    def sign_apk_bytes(cls, unsigned_apk: bytes, key_alias: str = "androiddebugkey") -> bytes:
-        """Signs APK in-memory with v1 and v2 signature schemes."""
+    def sign_apk_bytes(
+        cls,
+        unsigned_apk: bytes,
+        key_alias: str = "androiddebugkey",
+        alignment: int = 4,
+        so_alignment: int = 16384,
+    ) -> bytes:
+        """Signs APK in-memory with v1 and v2 signature schemes, ensuring uncompressed entries remain 4B/16KB aligned."""
         import io
+        from pureapk.builder import align_zip_entry
 
         in_buf = io.BytesIO(unsigned_apk)
         in_zf = zipfile.ZipFile(in_buf, "r")
 
-        entries: Dict[str, bytes] = {}
+        entries: Dict[str, Tuple[zipfile.ZipInfo, bytes]] = {}
         for info in in_zf.infolist():
             if not info.filename.upper().startswith("META-INF/"):
-                entries[info.filename] = in_zf.read(info.filename)
+                entries[info.filename] = (info, in_zf.read(info.filename))
 
         # 1. MANIFEST.MF
         manifest_lines = [
@@ -226,7 +233,7 @@ class APKSigner:
         ]
         entry_digests: Dict[str, str] = {}
         for name in sorted(entries.keys()):
-            data = entries[name]
+            _, data = entries[name]
             d = base64.b64encode(hashlib.sha256(data).digest()).decode("ascii")
             entry_digests[name] = d
             manifest_lines.append(f"Name: {name}".encode("utf-8"))
@@ -260,16 +267,20 @@ class APKSigner:
             + b"\x00" * 32 + cert_hash
         )
 
-        # 4. Pack v1-signed ZIP
+        # 4. Pack v1-signed ZIP with page alignment
         v1_buf = io.BytesIO()
-        with zipfile.ZipFile(v1_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(v1_buf, "w") as zf:
             zf.writestr("META-INF/MANIFEST.MF", manifest_data)
             zf.writestr("META-INF/CERT.SF", sf_data)
             zf.writestr("META-INF/CERT.RSA", cert_rsa_data)
-            for name, data in entries.items():
-                info = zipfile.ZipInfo(name)
-                info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = 0o644 << 16
+            for name in sorted(entries.keys()):
+                old_info, data = entries[name]
+                info = zipfile.ZipInfo(old_info.filename)
+                info.compress_type = old_info.compress_type
+                info.external_attr = old_info.external_attr or (0o644 << 16)
+                if info.compress_type == zipfile.ZIP_STORED:
+                    align = so_alignment if info.filename.endswith(".so") else alignment
+                    info.extra = align_zip_entry(zf.fp.tell(), info.filename, b"", align)
                 zf.writestr(info, data)
 
         v1_bytes = v1_buf.getvalue()
@@ -307,10 +318,17 @@ class APKSigner:
         input_path: Union[str, Path],
         output_path: Optional[Union[str, Path]] = None,
         key_alias: str = "androiddebugkey",
+        alignment: int = 4,
+        so_alignment: int = 16384,
     ) -> None:
         """Signs an APK file on disk."""
         in_p = Path(input_path)
         out_p = Path(output_path or in_p)
         raw = in_p.read_bytes()
-        signed = cls.sign_apk_bytes(raw, key_alias=key_alias)
+        signed = cls.sign_apk_bytes(
+            raw,
+            key_alias=key_alias,
+            alignment=alignment,
+            so_alignment=so_alignment,
+        )
         out_p.write_bytes(signed)

@@ -301,15 +301,65 @@ class APK:
     def is_python_app(self) -> bool:
         return self.framework in ("kivy", "pygame", "python")
 
+    def check_alignment(self, so_alignment: int = 16384, file_alignment: int = 4) -> Dict[str, Any]:
+        """Checks if uncompressed files are aligned to page boundaries (16KB for .so, 4B for others)."""
+        zf = self.zip_file
+        unaligned: List[Dict[str, Any]] = []
+        aligned_so_count = 0
+        total_so_count = 0
+
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            is_so = info.filename.endswith(".so")
+            if is_so:
+                total_so_count += 1
+
+            if info.compress_type == zipfile.ZIP_STORED:
+                target_align = so_alignment if is_so else file_alignment
+                fn_bytes = info.filename.encode("utf-8")
+                data_offset = info.header_offset + 30 + len(fn_bytes) + len(info.extra)
+                rem = data_offset % target_align
+                if rem != 0:
+                    unaligned.append({
+                        "filename": info.filename,
+                        "data_offset": data_offset,
+                        "target_alignment": target_align,
+                        "remainder": rem,
+                    })
+                elif is_so:
+                    aligned_so_count += 1
+
+        is_16k_compliant = (total_so_count == 0) or (
+            aligned_so_count == total_so_count and not any(u["filename"].endswith(".so") for u in unaligned)
+        )
+
+        return {
+            "is_aligned": len(unaligned) == 0,
+            "so_16k_compliant": is_16k_compliant,
+            "total_so_files": total_so_count,
+            "aligned_so_files": aligned_so_count,
+            "unaligned_files": unaligned,
+        }
+
+    @property
+    def is_aligned_16k(self) -> bool:
+        """Returns True if all uncompressed shared libraries (.so) are 16KB-page aligned."""
+        return bool(self.check_alignment(so_alignment=16384, file_alignment=4)["so_16k_compliant"])
+
     def verify(self) -> Dict[str, Any]:
-        """Validates internal CRC checksums and returns integrity status."""
+        """Validates internal CRC checksums, signature schemes, and 16KB/4B page alignment."""
         bad_file = self.zip_file.testzip()
         is_corrupt = bad_file is not None
+        align_info = self.check_alignment()
         return {
             "is_valid": not is_corrupt,
             "corrupted_file": bad_file,
             "is_signed": self.signature.is_signed,
             "signature_schemes": list(self.signature.scheme_names),
+            "is_aligned": align_info["is_aligned"],
+            "so_16k_compliant": align_info["so_16k_compliant"],
+            "unaligned_files": align_info["unaligned_files"],
         }
 
     def info(self) -> Dict[str, Any]:
@@ -332,6 +382,7 @@ class APK:
             "native_architectures": list(self.native_architectures),
             "dex": self.dex.as_dict(),
             "signature": self.signature.as_dict(),
+            "is_aligned_16k": self.is_aligned_16k,
             "total_files": len(self.files),
         }
 

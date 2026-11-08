@@ -60,8 +60,15 @@
 ## 📦 Installation
 
 ```bash
-# Standard installation via PyPI
+# Standard ultra-lightweight installation via PyPI (zero dependencies, ~35 KB)
 pip install pureapk
+
+# With optional framework extras for local desktop testing
+pip install "pureapk[flet]"    # includes Flet / Flutter
+pip install "pureapk[kivy]"    # includes Kivy
+pip install "pureapk[pygame]"  # includes Pygame-CE
+pip install "pureapk[toga]"    # includes BeeWare Toga
+pip install "pureapk[all]"     # all UI & game frameworks
 
 # Or install backwards-compatible alias
 pip install pyapk
@@ -72,7 +79,7 @@ uv add pureapk
 
 ### Install Pre-Built Universal Wheel Directly from GitHub
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v0.1.0/pureapk-0.1.0-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v0.1.1/pureapk-0.1.1-py3-none-any.whl
 ```
 
 ---
@@ -300,6 +307,33 @@ pureapk extract application.apk -o output_dir/
 
 # Pack Directory to APK with 4-byte alignment
 pureapk pack src_directory/ -o output.apk
+
+# Fast Framework Scaffolding & Packaging (Kivy, Pygame, Flet, Toga, Ren'Py, WebView)
+pureapk init-flet my_app --title "Flet App"
+pureapk pack-flet my_app/ -o flet.apk --release
+
+pureapk init-toga my_app --title "Toga App"
+pureapk pack-toga my_app/ -o toga.apk --release
+
+pureapk init-renpy my_novel --title "Visual Novel"
+pureapk pack-renpy my_novel/ -o novel.apk --release
+
+pureapk init-webview my_web --title "WebView App"
+pureapk pack-webview my_web/ -o web.apk --release
+
+pureapk init-kivy my_kivy --title "Kivy App"
+pureapk pack-kivy my_kivy/ -o kivy.apk --release
+
+pureapk init-pygame my_game --title "Pygame App"
+pureapk pack-pygame my_game/ -o game.apk --release
+
+# Multi-Store Packaging (Google Play AAB, Apple IPA, Microsoft Store MSIX)
+pureapk pack-aab project_dir/ -o app.aab
+pureapk init-ios ios_app/ --title "MyIOSApp" --bundle-id "com.company.app"
+pureapk pack-ipa ios_app/ -o app.ipa --title "MyIOSApp"
+pureapk init-windows win_app/ --title "MyWinApp" --package "MyCompany.MyWinApp"
+pureapk pack-msix win_app/ -o app.msix
+pureapk generate-keystore -o release.keystore --alias production
 ```
 
 ---

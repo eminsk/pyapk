@@ -60,8 +60,15 @@
 ## 📦 Установка
 
 ```bash
-# Стандартная установка через PyPI
+# Стандартная чистая установка через PyPI (ноль зависимостей, всего ~35 КБ)
 pip install pureapk
+
+# С предустановленными библиотеками для локального запуска (опционально)
+pip install "pureapk[flet]"    # вместе с Flutter/Flet
+pip install "pureapk[kivy]"    # вместе с Kivy
+pip install "pureapk[pygame]"  # вместе с Pygame-CE
+pip install "pureapk[toga]"    # вместе с BeeWare Toga
+pip install "pureapk[all]"     # всё включено
 
 # Либо установка обратно-совместимого алиаса
 pip install pyapk
@@ -300,6 +307,33 @@ pureapk extract application.apk -o output_dir/
 
 # Сборка директории в APK с выравниванием по 4 байта
 pureapk pack src_directory/ -o output.apk
+
+# Быстрый старт проектов и упаковка (Kivy, Pygame, Flet, Toga, Ren'Py, WebView)
+pureapk init-flet my_app --title "Flet App"
+pureapk pack-flet my_app/ -o flet.apk --release
+
+pureapk init-toga my_app --title "Toga App"
+pureapk pack-toga my_app/ -o toga.apk --release
+
+pureapk init-renpy my_novel --title "Visual Novel"
+pureapk pack-renpy my_novel/ -o novel.apk --release
+
+pureapk init-webview my_web --title "WebView App"
+pureapk pack-webview my_web/ -o web.apk --release
+
+pureapk init-kivy my_kivy --title "Kivy App"
+pureapk pack-kivy my_kivy/ -o kivy.apk --release
+
+pureapk init-pygame my_game --title "Pygame App"
+pureapk pack-pygame my_game/ -o game.apk --release
+
+# Подготовка к магазинам приложений (Google Play AAB, Apple IPA, Windows MSIX)
+pureapk pack-aab project_dir/ -o app.aab
+pureapk init-ios ios_app/ --title "MyIOSApp" --bundle-id "com.company.app"
+pureapk pack-ipa ios_app/ -o app.ipa --title "MyIOSApp"
+pureapk init-windows win_app/ --title "MyWinApp" --package "MyCompany.MyWinApp"
+pureapk pack-msix win_app/ -o app.msix
+pureapk generate-keystore -o release.keystore --alias production
 ```
 
 ---

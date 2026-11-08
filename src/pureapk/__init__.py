@@ -7,6 +7,7 @@ compatible with CPython 3.8 - 3.16, Free-Threaded (No-GIL), and PyPy.
 
 from __future__ import annotations
 
+from typing import Any
 from pureapk.apk import APK, APKFileInfo
 from pureapk.builder import APKBuilder, pack
 from pureapk.dex import DexBuilder, DexHeader, MultiDexSummary
@@ -15,6 +16,8 @@ from pureapk.frameworks import (
     FrameworkDetector,
     KivyAppHelper,
     PygameAppHelper,
+    PyQtAppHelper,
+    PySideAppHelper,
     RenPyAppHelper,
     TogaAppHelper,
     WebViewAppHelper,
@@ -54,6 +57,8 @@ __all__ = [
     "TogaAppHelper",
     "RenPyAppHelper",
     "WebViewAppHelper",
+    "PySideAppHelper",
+    "PyQtAppHelper",
     "AABBuilder",
     "IPABuilder",
     "MSIXBuilder",

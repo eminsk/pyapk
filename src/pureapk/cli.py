@@ -244,6 +244,21 @@ def cmd_pack_webview(args: argparse.Namespace) -> int:
     print(f"Successfully packaged WebView APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
+def cmd_init_pyside(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import PySideAppHelper
+    PySideAppHelper.init_project(args.target_dir, title=args.title)
+    print(f"Successfully initialized PySide/Qt project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_pyside(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import PySideAppHelper
+    rel_mode = "release" if getattr(args, "release", False) else "debug"
+    PySideAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged PySide/Qt APK ({rel_mode}): {args.output}")
+    return 0
+
+
 
 def cmd_pack_aab(args: argparse.Namespace) -> int:
     from pureapk.stores import AABBuilder
@@ -443,6 +458,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_web.add_argument("--title", default="WebView App", help="App title")
     p_pack_web.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
 
+    # init-pyside / init-pyqt
+    p_init_pyside = subparsers.add_parser("init-pyside", aliases=["init-pyqt"], help="Scaffold a PySide6 / PyQt6 Qt for Android project")
+    p_init_pyside.add_argument("target_dir", help="Target project folder")
+    p_init_pyside.add_argument("--title", default="PySide App", help="App display title")
+
+    # pack-pyside / pack-pyqt
+    p_pack_pyside = subparsers.add_parser("pack-pyside", aliases=["pack-pyqt"], help="Pack a PySide6 / PyQt6 Qt project into an APK")
+    p_pack_pyside.add_argument("source_dir", help="PySide / PyQt project folder")
+    p_pack_pyside.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_pyside.add_argument("--title", default="PySide App", help="App title")
+    p_pack_pyside.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
     # pack-aab (Google Play Console)
     p_pack_aab = subparsers.add_parser("pack-aab", help="Build Google Play Android App Bundle (.aab)")
     p_pack_aab.add_argument("source_dir", help="Source folder containing project / base assets")
@@ -490,7 +517,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
-        "init-renpy", "pack-renpy", "init-webview", "pack-webview",
+        "init-renpy", "pack-renpy", "init-webview", "pack-webview", "init-pyside", "init-pyqt", "pack-pyside", "pack-pyqt",
         "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore", "sign", "compile-manifest",
     }
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
@@ -528,6 +555,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "pack-renpy": cmd_pack_renpy,
         "init-webview": cmd_init_webview,
         "pack-webview": cmd_pack_webview,
+        "init-pyside": cmd_init_pyside,
+        "init-pyqt": cmd_init_pyside,
+        "pack-pyside": cmd_pack_pyside,
+        "pack-pyqt": cmd_pack_pyside,
         "pack-aab": cmd_pack_aab,
         "init-ios": cmd_init_ios,
         "pack-ipa": cmd_pack_ipa,

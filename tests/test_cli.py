@@ -130,3 +130,11 @@ def test_cli_framework_subcommands(tmp_path: Path) -> None:
     assert (w_dir / "assets" / "index.html").exists()
     assert main(["pack-webview", str(w_dir), "-o", str(w_apk), "--title", "WebCLI", "--release"]) == 0
     assert w_apk.exists()
+
+    # 5. pyside / pyqt
+    p_dir = tmp_path / "cli_pyside"
+    p_apk = tmp_path / "pyside.apk"
+    assert main(["init-pyside", str(p_dir), "--title", "PySideCLI"]) == 0
+    assert (p_dir / "main.py").exists()
+    assert main(["pack-pyside", str(p_dir), "-o", str(p_apk), "--title", "PySideCLI", "--release"]) == 0
+    assert p_apk.exists()

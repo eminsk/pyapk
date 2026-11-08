@@ -173,3 +173,17 @@ def test_flet_toga_renpy_webview_helpers(tmp_path: Path) -> None:
     assert (w_dir / "assets" / "index.html").exists()
     WebViewAppHelper.pack_app(w_dir, w_apk, app_title="MyWeb", release=True)
     assert w_apk.exists()
+
+    # PySide / PyQt
+    from pureapk.frameworks import PySideAppHelper, PyQtAppHelper
+    py_dir = tmp_path / "pyside_proj"
+    py_apk = tmp_path / "pyside.apk"
+    PySideAppHelper.init_project(py_dir, title="MyPySide")
+    assert (py_dir / "main.py").exists()
+    PySideAppHelper.pack_app(py_dir, py_apk, app_title="MyPySide", release=True)
+    assert py_apk.exists()
+
+    with APK(py_apk) as apk:
+        assert "org.qtproject.qt.android.bindings.QtActivity" in apk.manifest.activities
+        assert apk.framework == "pyside"
+        assert apk.signature.is_signed is True

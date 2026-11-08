@@ -17,6 +17,8 @@ from pureapk.frameworks import (
     RenPyAppHelper,
     TogaAppHelper,
     WebViewAppHelper,
+    PySideAppHelper,
+    PyQtAppHelper,
 )
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement, AxmlEncoder
 from pureapk.signature import APKCertificate, APKSigner, APKSignature
@@ -52,6 +54,8 @@ def test_classes_have_slots_and_no_dict() -> None:
         TogaAppHelper,
         RenPyAppHelper,
         WebViewAppHelper,
+        PySideAppHelper,
+        PyQtAppHelper,
         AABBuilder,
         IPABuilder,
         MSIXBuilder,

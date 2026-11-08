@@ -42,6 +42,14 @@ FRAMEWORK_SIGNATURES: Dict[str, Tuple[str, ...]] = {
         "android.webkit.WebView",
         "assets/index.html",
     ),
+    "pyside": (
+        "org.qtproject.qt.android.bindings.QtActivity",
+        "libplugins_platforms_qtforandroid.so",
+        "libQt6Core.so",
+        "libQt5Core.so",
+        "pyside6",
+        "pyqt6",
+    ),
     "flutter": ("libflutter.so", "io.flutter.app.FlutterActivity"),
     "react-native": ("libreactnativejni.so", "com.facebook.react"),
     "unity": ("libunity.so", "com.unity3d.player"),
@@ -781,3 +789,109 @@ class WebViewAppHelper:
 
         _pack_framework_project(builder, src, is_webview=True)
         builder.build()
+
+
+class PySideAppHelper:
+    """Helper utilities and template generators for Qt for Android (PySide6 / PyQt6) applications."""
+
+    __slots__ = ()
+
+    @staticmethod
+    def generate_manifest_xml(
+        package_name: str,
+        app_title: str,
+        version_code: int = 1,
+        version_name: str = "0.1",
+        orientation: str = "unspecified",
+    ) -> str:
+        return f"""<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="{package_name}"
+    android:versionCode="{version_code}"
+    android:versionName="{version_name}">
+
+    <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+
+    <application
+        android:label="{app_title}"
+        android:icon="@mipmap/ic_launcher"
+        android:hardwareAccelerated="true">
+        <activity
+            android:name="org.qtproject.qt.android.bindings.QtActivity"
+            android:label="{app_title}"
+            android:screenOrientation="{orientation}"
+            android:configChanges="orientation|screenSize"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.lib_name" android:value="main" />
+        </activity>
+    </application>
+</manifest>
+"""
+
+    @staticmethod
+    def init_project(target_dir: Union[str, Path], title: str = "PySide App") -> None:
+        path = Path(target_dir)
+        path.mkdir(parents=True, exist_ok=True)
+        main_py = path / "main.py"
+        if not main_py.exists():
+            main_py.write_text(
+                "import sys\n"
+                "try:\n"
+                "    from PySide6.QtWidgets import QApplication, QLabel, QMainWindow\n"
+                "except ImportError:\n"
+                "    from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow\n\n"
+                "class MainWindow(QMainWindow):\n"
+                "    def __init__(self):\n"
+                "        super().__init__()\n"
+                f"        self.setWindowTitle('{title}')\n"
+                f"        label = QLabel('Hello from {title} (Qt for Android)!', self)\n"
+                "        self.setCentralWidget(label)\n\n"
+                "if __name__ == '__main__':\n"
+                "    app = QApplication(sys.argv)\n"
+                "    win = MainWindow()\n"
+                "    win.show()\n"
+                "    sys.exit(app.exec())\n",
+                encoding="utf-8",
+            )
+
+    @staticmethod
+    def pack_app(
+        source_dir: Union[str, Path],
+        output_apk: Union[str, Path],
+        package_name: str = "org.qtproject.pysideapp",
+        app_title: str = "PySide App",
+        release: bool = False,
+    ) -> None:
+        from pureapk.builder import APKBuilder
+        from pureapk.stores import ReleaseHelper
+        src = Path(source_dir)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
+        manifest_path = src / "AndroidManifest.xml"
+        if manifest_path.exists():
+            builder.add_file(manifest_path, "AndroidManifest.xml")
+        else:
+            manifest_str = PySideAppHelper.generate_manifest_xml(package_name, app_title)
+            if release:
+                manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
+            builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
+
+        _pack_framework_project(builder, src)
+        builder.build()
+
+
+# Alias for PyQt applications
+PyQtAppHelper = PySideAppHelper
+

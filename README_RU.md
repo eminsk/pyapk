@@ -83,7 +83,7 @@ uv add pureapk
 
 ### Установка готового универсального колеса прямо из GitHub Releases
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v0.1.1/pureapk-0.1.1-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v1.0.0/pureapk-1.0.0-py3-none-any.whl
 ```
 
 ### Установка в Ubuntu / Debian через официальный репозиторий APT (PPA)
@@ -95,7 +95,7 @@ curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash
 sudo apt install python3-pureapk
 
 # Либо установка готового пакета .deb напрямую
-sudo dpkg -i python3-pureapk_0.1.1-1_all.deb
+sudo dpkg -i python3-pureapk_1.0.0-1_all.deb
 ```
 
 ### Установка через Conda / Mamba / Pixi (Anaconda.org)

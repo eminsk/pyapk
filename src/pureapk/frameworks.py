@@ -117,9 +117,9 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
                 full_f = Path(root) / f
                 rel_f = full_f.relative_to(src)
                 rel_parts = rel_f.parts
-                if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__"):
+                if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__") or rel_parts[0].endswith((".dist-info", ".egg-info")):
                     continue
-                if rel_parts[0] in ("AndroidManifest.xml", "buildozer.spec"):
+                if rel_parts[0] in ("AndroidManifest.xml", "buildozer.spec", ".lock"):
                     continue
                 rel_str = str(rel_f).replace("\\", "/")
                 tf.add(str(full_f), arcname=rel_str)

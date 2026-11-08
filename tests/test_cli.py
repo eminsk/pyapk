@@ -138,3 +138,9 @@ def test_cli_framework_subcommands(tmp_path: Path) -> None:
     assert (p_dir / "main.py").exists()
     assert main(["pack-pyside", str(p_dir), "-o", str(p_apk), "--title", "PySideCLI", "--release"]) == 0
     assert p_apk.exists()
+
+
+def test_cli_install_deps_validation(tmp_path: Path) -> None:
+    empty_dir = tmp_path / "empty_proj"
+    # Fails gracefully if no packages provided
+    assert main(["install-deps", str(empty_dir)]) == 1

@@ -29,6 +29,31 @@ def cmd_info(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
+
 
 def _format_info_human(apk: APK, data: Dict[str, Any]) -> None:
     print(f"Package:        {data['package_name']}")
@@ -57,6 +82,31 @@ def cmd_manifest(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
+
 
 def cmd_permissions(args: argparse.Namespace) -> int:
     with APK(args.apk_path) as apk:
@@ -68,6 +118,31 @@ def cmd_permissions(args: argparse.Namespace) -> int:
         output_dispatch[args.json]()
     return 0
 
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
+
 
 def cmd_dex(args: argparse.Namespace) -> int:
     with APK(args.apk_path) as apk:
@@ -78,6 +153,31 @@ def cmd_dex(args: argparse.Namespace) -> int:
         }
         output_dispatch[args.json]()
     return 0
+
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
 
 
 def _format_dex_human(dex_info: Dict[str, Any]) -> None:
@@ -98,6 +198,31 @@ def cmd_files(args: argparse.Namespace) -> int:
         }
         output_dispatch[args.json]()
     return 0
+
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
 
 
 def _format_files_human(files: List[Dict[str, Any]]) -> None:
@@ -321,6 +446,31 @@ def cmd_generate_keystore(args: argparse.Namespace) -> int:
     output_dispatch[args.json]()
     return 0
 
+def cmd_install_deps(args: argparse.Namespace) -> int:
+    import shutil
+    import subprocess
+    target_dir = Path(args.project_dir)
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uv_bin = shutil.which("uv")
+    cmd = [uv_bin, "pip", "install", "--target", str(target_dir)] if uv_bin else [sys.executable, "-m", "pip", "install", "--target", str(target_dir)]
+
+    if args.requirements:
+        cmd.extend(["-r", str(args.requirements)])
+    if args.packages:
+        cmd.extend(args.packages)
+
+    if not args.requirements and not args.packages:
+        print("Error: No packages or requirements.txt specified.")
+        return 1
+
+    print(f"Installing dependencies into: {target_dir}...")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f"Successfully installed dependencies into: {target_dir}")
+    return res.returncode
+
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -498,6 +648,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_msix.add_argument("source_dir", help="Source directory containing AppxManifest.xml and assets")
     p_pack_msix.add_argument("-o", "--output", required=True, help="Output .msix filename")
 
+    # install-deps
+    p_inst = subparsers.add_parser("install-deps", aliases=["add-deps"], help="Install pure Python dependencies directly into a project folder")
+    p_inst.add_argument("project_dir", help="Project folder to install dependencies into")
+    p_inst.add_argument("packages", nargs="*", help="Package names to install (e.g. requests urllib3)")
+    p_inst.add_argument("-r", "--requirements", help="Path to requirements.txt file")
+
     # generate-keystore
     p_key = subparsers.add_parser("generate-keystore", help="Generate production release signing profile")
     p_key.add_argument("-o", "--output", required=True, help="Output keystore filename")
@@ -518,7 +674,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
         "init-renpy", "pack-renpy", "init-webview", "pack-webview", "init-pyside", "init-pyqt", "pack-pyside", "pack-pyqt",
-        "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore", "sign", "compile-manifest",
+        "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore", "sign", "compile-manifest", "install-deps", "add-deps",
     }
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
     is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
@@ -567,6 +723,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "generate-keystore": cmd_generate_keystore,
         "sign": cmd_sign,
         "compile-manifest": cmd_compile_manifest,
+        "install-deps": cmd_install_deps,
+        "add-deps": cmd_install_deps,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

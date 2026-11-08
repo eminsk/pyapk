@@ -194,6 +194,82 @@ pureapk pack-msix win_project/ -o application.msix
 
 ---
 
+## 🔑 Code Signing & Certificate Guide (Android, Apple, Windows)
+
+Distribution to official app stores and local testing requires digital signatures. Here is a step-by-step guide for each platform.
+
+### 1. 🤖 Android (Google Play, RuStore, Huawei AppGallery)
+
+- **Debug Keystore (Local Device Testing)**:
+  Used by default for rapid sideloading via USB or Wi-Fi (`adb install app.apk`).
+- **Release Keystore (Production Stores & Users)**:
+  Stores reject debug signatures. Create a production RSA-2048/4096 signing key:
+  ```bash
+  # Generate release signing profile via pureapk:
+  pureapk generate-keystore -o release.keystore --alias production --password my_secret_pass
+
+  # Or using standard keytool:
+  keytool -genkey -v -keystore release.keystore -alias production -keyalg RSA -keysize 2048 -validity 10000
+  ```
+- **Verifying Signatures in pureapk**:
+  ```bash
+  pureapk verify my_app.apk
+  # Inspect active schemes (v1, v2, v3, v4) and certificate fingerprints (SHA-256, SHA-1):
+  pureapk info my_app.apk --json
+  ```
+- **Google Play App Signing**: When uploading an `.aab` bundle to Google Play Console, you sign with your **Upload Key**. Google Play manages and signs the final user-facing APKs with your master **App Signing Key**.
+
+---
+
+### 2. 🍏 Apple App Store (iOS & macOS)
+
+- **Requirements**:
+  1. **Apple Developer Program** account ($99/year).
+  2. **Distribution Certificate** (`.p12` file exported from Apple Developer portal).
+  3. **Provisioning Profile** (`embedded.mobileprovision`) matching your App ID (`com.company.myapp`).
+- **Workflow with pureapk**:
+  1. Scaffold project with valid `Info.plist`:
+     ```bash
+     pureapk init-ios my_app --title "CoolApp" --bundle-id "com.company.coolapp"
+     ```
+  2. Include `embedded.mobileprovision` and build the `.ipa`:
+     ```bash
+     pureapk pack-ipa my_app/ -o CoolApp.ipa --title "CoolApp"
+     ```
+  3. Code Signing:
+     - **On macOS**: `codesign -s "Apple Distribution: Team Name (TEAM_ID)" --entitlements entitlements.plist Payload/CoolApp.app`
+     - **On Windows / Linux** (without Mac): using open-source cross-platform `zsign`:
+       ```bash
+       zsign -k cert.p12 -p password -m embedded.mobileprovision -o Signed.ipa CoolApp.ipa
+       ```
+  4. Submit to App Store: Upload using **Apple Transporter** (free for Windows and macOS) directly to **App Store Connect**.
+
+---
+
+### 3. 🪟 Windows (Microsoft Store & Sideloading)
+
+- **For Microsoft Store Submission**:
+  - You **DO NOT** need to purchase an expensive Commercial Code Signing Certificate.
+  - When registering at **Microsoft Partner Center** ($19 one-time fee), Microsoft assigns your account a unique **Publisher ID** (e.g. `CN=12345678-ABCD-EF01-...`).
+  - Configure this ID when initializing your project:
+    ```bash
+    pureapk init-windows win_app --title "CoolApp" --package "MyCompany.CoolApp"
+    pureapk pack-msix win_app/ -o CoolApp.msix
+    ```
+  - Upload `CoolApp.msix` to Partner Center. **Microsoft Store automatically signs the package with their trusted Authenticode certificate during the store ingestion process.**
+- **For Local Sideloading (Testing outside Store)**:
+  - Create a local self-signed certificate via PowerShell:
+    ```powershell
+    $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=MyCompany" -KeyUsage DigitalSignature -FriendlyName "PureApk Dev Cert" -CertStoreLocation "Cert:\CurrentUser\My"
+    Export-PfxCertificate -Cert $cert -FilePath dev_cert.pfx -Password (ConvertTo-SecureString -String "1234" -Force -AsPlainText)
+    ```
+  - Sign using `SignTool`:
+    ```powershell
+    signtool sign /fd SHA256 /a /f dev_cert.pfx /p 1234 CoolApp.msix
+    ```
+
+---
+
 ## 🖥️ Command Line Interface (CLI)
 
 Both `pureapk` and `pyapk` commands are installed.

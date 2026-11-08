@@ -194,6 +194,82 @@ pureapk pack-msix win_project/ -o application.msix
 
 ---
 
+## 🔑 Сертификаты и цифровая подпись: Полное руководство
+
+Публикация в магазины и распространение на устройствах требует цифровой подписи. Ниже приведено пошаговое руководство для каждой платформы.
+
+### 1. 🤖 Android (Google Play, RuStore, Huawei AppGallery)
+
+- **Debug-ключ (для тестирования на телефоне)**:
+  Используется по умолчанию для быстрой установки по проводу или через Wi-Fi (`adb install app.apk`).
+- **Release-ключ (для сторов и пользователей)**:
+  Магазины приложений отвергают debug-подписи. Для релиза создаётся надёжный RSA-2048/4096 ключ:
+  ```bash
+  # Создание ключа релизной подписи через pureapk:
+  pureapk generate-keystore -o release.keystore --alias production --password my_secret_pass
+
+  # Либо через стандартную утилиту keytool:
+  keytool -genkey -v -keystore release.keystore -alias production -keyalg RSA -keysize 2048 -validity 10000
+  ```
+- **Проверка подписи в pureapk**:
+  ```bash
+  pureapk verify my_app.apk
+  # Вывод всех схем подписи (v1, v2, v3, v4) и отпечатков SHA-256 / SHA-1:
+  pureapk info my_app.apk --json
+  ```
+- **Google Play App Signing**: При загрузке `.aab` в Google Play Console вы подписываете бандл своим ключом загрузки (**Upload Key**), а Google автоматически подписывает готовые APK своим мастер-сертификатом.
+
+---
+
+### 2. 🍏 Apple App Store (iOS & macOS)
+
+- **Что требуется**:
+  1. Аккаунт **Apple Developer Program** ($99/год).
+  2. **Distribution Certificate** (`.p12` сертификат распространения из кабинета Apple Developer).
+  3. **Provisioning Profile** (`embedded.mobileprovision`), привязанный к вашему App ID (например, `com.company.myapp`).
+- **Как это работает в pureapk**:
+  1. Создаём структуру с корректным `Info.plist`:
+     ```bash
+     pureapk init-ios my_app --title "CoolApp" --bundle-id "com.company.coolapp"
+     ```
+  2. Помещаем `embedded.mobileprovision` в проект и собираем `.ipa`:
+     ```bash
+     pureapk pack-ipa my_app/ -o CoolApp.ipa --title "CoolApp"
+     ```
+  3. Подписание IPA:
+     - **На macOS**: `codesign -s "Apple Distribution: Team Name (TEAM_ID)" --entitlements entitlements.plist Payload/CoolApp.app`
+     - **На Windows/Linux** (без Mac): с помощью открытой кроссплатформенной утилиты `zsign`:
+       ```bash
+       zsign -k cert.p12 -p password -m embedded.mobileprovision -o Signed.ipa CoolApp.ipa
+       ```
+  4. Загрузка в App Store: через бесплатную программу **Apple Transporter** (доступна для Windows и macOS) прямо в **App Store Connect**.
+
+---
+
+### 3. 🪟 Windows (Microsoft Store & Sideloading)
+
+- **Для публикации в официальный Microsoft Store**:
+  - Вам **НЕ нужно** покупать дорогостоящий сертификат Code Signing!
+  - При регистрации в **Microsoft Partner Center** ($19 разово) вам присваивается уникальный **Publisher ID** (вид: `CN=12345678-ABCD-EF01-...`).
+  - Укажите этот ID при генерации манифеста:
+    ```bash
+    pureapk init-windows win_app --title "CoolApp" --package "MyCompany.CoolApp"
+    pureapk pack-msix win_app/ -o CoolApp.msix
+    ```
+  - Загрузите `CoolApp.msix` в Partner Center. **Microsoft Store автоматически подпишет ваш пакет своим доверенным сертификатом Authenticode во время публикации.**
+- **Для локальной установки вне магазина (Sideloading)**:
+  - Создайте бесплатный сертификат разработчика в PowerShell:
+    ```powershell
+    $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=MyCompany" -KeyUsage DigitalSignature -FriendlyName "PureApk Dev Cert" -CertStoreLocation "Cert:\CurrentUser\My"
+    Export-PfxCertificate -Cert $cert -FilePath dev_cert.pfx -Password (ConvertTo-SecureString -String "1234" -Force -AsPlainText)
+    ```
+  - Подпишите пакет с помощью `SignTool`:
+    ```powershell
+    signtool sign /fd SHA256 /a /f dev_cert.pfx /p 1234 CoolApp.msix
+    ```
+
+---
+
 ## 🖥️ Консольная утилита (CLI)
 
 Устанавливаются команды `pureapk` и `pyapk`.

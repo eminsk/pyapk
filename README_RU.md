@@ -54,7 +54,8 @@
 - ⚡ **Zero-Copy и минимальная память**: Во всех ключевых классах строго используется `__slots__` (без оверхеда динамического словаря `__dict__`) и срезы `memoryview`.
 - 🎯 **Функциональная архитектура без циклов и ветвлений**: Чистые паттерны функционального программирования, таблицы диспетчеризации словарей и потоки итераторов для предсказуемого и быстрого исполнения в горячих путях.
 - 🧵 **Безопасность в Free-Threaded (No-GIL)**: Поддержка параллельного парсинга без блокировок и потокобезопасная ленивая инициализация свойств.
-- 📱 **Встроенный тулчейн для Kivy и Pygame**: Генерация каркасов проектов, создание манифестов и прямая упаковка в APK с 4-байтным ZIP-выравниванием ресурсов.
+- 📱 **Встроенный тулчейн для Kivy, Pygame и GUI**: Генерация каркасов проектов, создание манифестов и прямая упаковка в APK с 4-байтным и 16-килобайтным (Android 15+) ZIP-выравниванием ресурсов и библиотек `.so` (Android тег `0xd935`).
+- 🧩 **Поддержка Android Wheels и Cython**: Нативная распаковка предсобранных `.whl` пакетов с раскладкой `.so` по каталогам `lib/<abi>/` и встроенный генератор GitHub Actions CI для облачной компиляции C/Cython под Android NDK без засорения локальной системы.
 - 🏬 **Публикация в маркетплейсы**: Встроенная сборка пакетов для Google Play (`.aab` Android App Bundle), Apple App Store (`.ipa` с `Info.plist`) и Microsoft Store (`.msix` с `AppxBlockMap.xml`).
 - 🛠️ **Двойной CLI**: Доступны алиасы команд `pureapk` и `pyapk` как с человекопонятным, так и со структурированным выводом в `--json`.
 
@@ -161,6 +162,47 @@ with APK("application.apk") as apk:
         print("SHA-256:    ", cert.sha256)
         print("SHA-1:      ", cert.sha1)
         print("MD5:        ", cert.md5)
+```
+
+### 5. Проверка выравнивания 16 КБ (Android 15 Ready) и zipalign
+
+```python
+from pureapk import APK
+from pureapk.builder import zipalign
+
+# Проверка соответствия Android 15
+with APK("application.apk") as apk:
+    print("Android 15 Ready (16KB):", apk.is_aligned_16k)
+    align_info = apk.check_alignment()
+    print("Выровнено:", align_info["is_aligned"])
+    print("Библиотек .so:", align_info["aligned_so_files"], "/", align_info["total_so_files"])
+
+# Выравнивание существующего APK на чистом Python (4B для файлов, 16KB для .so)
+zipalign("unaligned.apk", "aligned.apk", so_alignment=16384, file_alignment=4)
+```
+
+### 6. Распаковка Android Wheels (.whl) в проект
+
+```python
+from pureapk.wheels import AndroidWheelHelper
+
+# Инспекция состава wheel
+info = AndroidWheelHelper.inspect_wheel("numpy-2.1.0-cp312-android_aarch64.whl")
+print(f"Пакет: {info['distribution_name']} {info['version']}, ABI: {info['detected_abi']}")
+print(f"Найдено .so библиотек: {info['native_libraries_count']}")
+
+# Распаковка: .so направляются в lib/<abi>/, а Python-код — в проект
+AndroidWheelHelper.unpack_wheel("numpy-2.1.0-cp312-android_aarch64.whl", target_dir="./my_app")
+```
+
+### 7. Генерация облачного CI для Cython и NDK
+
+```python
+from pureapk.ci import GitHubCythonWorkflowHelper
+
+# Генерация готового .github/workflows/build-native.yml и шаблонов Cython
+res = GitHubCythonWorkflowHelper.scaffold_project("./my_app", cython=True)
+print("Создан CI воркфлоу:", res["workflow_path"])
 ```
 
 ---

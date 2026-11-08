@@ -13,6 +13,21 @@ authors = [
 ]
 requires-python = ">=3.8"
 dependencies = []
+keywords = [
+    "apk",
+    "android",
+    "pure-python",
+    "zipalign",
+    "16kb-alignment",
+    "android15",
+    "aab",
+    "ipa",
+    "msix",
+    "wheels",
+    "cython",
+    "kivy",
+    "pygame",
+]
 
 classifiers = [
     "Development Status :: 5 - Production/Stable",

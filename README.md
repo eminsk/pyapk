@@ -54,7 +54,8 @@
 - ⚡ **Zero-Copy & Low Memory**: Uses `__slots__` exclusively across all core classes (no dynamic `__dict__` overhead) and `memoryview` slicing.
 - 🎯 **Branch-Free Functional Architecture**: Implements clean functional programming patterns, dictionary dispatch tables, and iterator streams for predictable, hot-path execution.
 - 🧵 **Free-Threaded / No-GIL Safe**: Designed for lock-free parallel parsing and thread-safe lazy property evaluation.
-- 📱 **First-Class Kivy & Pygame Toolchains**: Direct project scaffolding, manifest generation, and 4-byte ZIP-aligned packaging.
+- 📱 **First-Class Kivy, Pygame & GUI Toolchains**: Direct project scaffolding, manifest synthesis, and APK packaging with 4-byte and 16KB (Android 15+) page alignment for resources and `.so` libraries (Android tag `0xd935`).
+- 🧩 **Android Wheels & Cython Toolchain**: Native inspection and extraction of pre-compiled Android `.whl` wheels into `lib/<abi>/` directories and automated GitHub Actions CI generator for cloud C/Cython NDK builds without cluttering the local machine.
 - 🏬 **Multi-Store Distribution**: Built-in generators for Google Play (`.aab` Android App Bundle), Apple App Store (`.ipa` with `Info.plist`), and Microsoft Store (`.msix` with `AppxBlockMap.xml`).
 - 🛠️ **Dual CLI Entrypoints**: `pureapk` and `pyapk` commands installed with human and `--json` outputs.
 
@@ -161,6 +162,47 @@ with APK("application.apk") as apk:
         print("SHA-256:    ", cert.sha256)
         print("SHA-1:      ", cert.sha1)
         print("MD5:        ", cert.md5)
+```
+
+### 5. 16KB Page Alignment (Android 15 Ready) & zipalign
+
+```python
+from pureapk import APK
+from pureapk.builder import zipalign
+
+# Check Android 15 16KB alignment compliance
+with APK("application.apk") as apk:
+    print("Android 15 Ready (16KB):", apk.is_aligned_16k)
+    align_info = apk.check_alignment()
+    print("Is Aligned:", align_info["is_aligned"])
+    print(".so Libraries:", align_info["aligned_so_files"], "/", align_info["total_so_files"])
+
+# Align existing APK in pure Python (4B for files, 16KB for .so)
+zipalign("unaligned.apk", "aligned.apk", so_alignment=16384, file_alignment=4)
+```
+
+### 6. Unpacking Android Wheels (.whl) into Projects
+
+```python
+from pureapk.wheels import AndroidWheelHelper
+
+# Inspect wheel contents and target ABI
+info = AndroidWheelHelper.inspect_wheel("numpy-2.1.0-cp312-android_aarch64.whl")
+print(f"Package: {info['distribution_name']} {info['version']}, ABI: {info['detected_abi']}")
+print(f"Native .so count: {info['native_libraries_count']}")
+
+# Unpack: .so files go to lib/<abi>/, pure Python code to project root
+AndroidWheelHelper.unpack_wheel("numpy-2.1.0-cp312-android_aarch64.whl", target_dir="./my_app")
+```
+
+### 7. Cloud CI Generator for Cython & Android NDK
+
+```python
+from pureapk.ci import GitHubCythonWorkflowHelper
+
+# Scaffolds ready-to-run .github/workflows/build-native.yml and Cython template
+res = GitHubCythonWorkflowHelper.scaffold_project("./my_app", cython=True)
+print("Created CI workflow:", res["workflow_path"])
 ```
 
 ---

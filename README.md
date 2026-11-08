@@ -7,7 +7,7 @@
 
 [ 🇬🇧 English ] | [ 🇷🇺 Документация на русском ](README_RU.md)
 
-[![Release Version](https://img.shields.io/badge/release-v0.1.1-0969da.svg?style=flat&logo=github)](https://github.com/eminsk/pyapk/releases/tag/v0.1.1)
+[![GitHub Release](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
 [![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
 [![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
@@ -17,7 +17,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-49%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-61%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -177,7 +177,7 @@ with APK("application.apk") as apk:
 | **BeeWare (Toga)** | Native system widgets (`android.widget.*`, UIKit, WinUI) | `TogaAppHelper` | Android APK, iOS IPA, Windows MSIX |
 | **Ren'Py** | Visual novels, branching interactive fiction & story games | `RenPyAppHelper` | Android APK, Google Play AAB |
 | **WebView Apps** | HTML5/CSS/Tailwind UI + lightweight Python local backend | `WebViewAppHelper` | Android APK, iOS IPA, Windows MSIX |
-| **PySide6 / PyQt** | Qt-based desktop GUI & advanced graphics suites | `MSIXBuilder` | Windows MSIX (Microsoft Store) |
+| **PySide6 / PyQt** | Qt for Android & Windows desktop applications | `PySideAppHelper` | Android APK, Google Play AAB, Windows MSIX |
 
 ```bash
 # Scaffold mobile & desktop projects
@@ -187,6 +187,7 @@ pureapk init-flet my_flet_app --title "Flet Mobile App"
 pureapk init-toga my_toga_app --title "BeeWare Native App"
 pureapk init-renpy my_novel --title "Interactive Story"
 pureapk init-webview my_web_app --title "HTML5 Hybrid App"
+pureapk init-pyside my_qt_app --title "PySide6 Mobile App"
 
 # Package directly into APK (Debug or Store-Ready Release)
 pureapk pack-kivy my_kivy_app -o app.apk --release
@@ -195,6 +196,19 @@ pureapk pack-flet my_flet_app -o flet.apk --release
 pureapk pack-toga my_toga_app -o toga.apk --release
 pureapk pack-renpy my_novel -o novel.apk --release
 pureapk pack-webview my_web_app -o webview.apk --release
+pureapk pack-pyside my_qt_app -o qtapp.apk --release
+```
+
+### 📦 Installing Pure Python Dependencies (`install-deps`)
+
+Install any pure Python packages from PyPI directly into your project folder. `pureapk` will automatically compile them into bytecode (`.pyc`) and package them into `assets/private.tar`:
+
+```bash
+# Install individual packages (requests, urllib3, certifi, pydantic, etc.)
+pureapk install-deps my_app requests certifi urllib3
+
+# Or install from requirements.txt
+pureapk install-deps my_app -r requirements.txt
 ```
 
 ---
@@ -360,6 +374,19 @@ pureapk pack-kivy my_kivy/ -o kivy.apk --release
 
 pureapk init-pygame my_game --title "Pygame App"
 pureapk pack-pygame my_game/ -o game.apk --release
+
+pureapk init-pyside my_qt --title "PySide App"
+pureapk pack-pyside my_qt/ -o qt.apk --release
+
+# Install Dependencies directly into Application Folder
+pureapk install-deps my_app/ requests certifi urllib3
+pureapk install-deps my_app/ -r requirements.txt
+
+# Sign APK with v1 (JAR) and v2 (APK Sig Block 42) Schemes
+pureapk sign my_app.apk
+
+# Compile Text AndroidManifest.xml into Binary AXML
+pureapk compile-manifest AndroidManifest.xml -o AndroidManifest.axml
 
 # Multi-Store Packaging (Google Play AAB, Apple IPA, Microsoft Store MSIX)
 pureapk pack-aab project_dir/ -o app.aab

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import sys
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
@@ -130,8 +131,33 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
-    pack(args.source_dir, args.output)
+    pack(
+        args.source_dir,
+        args.output,
+        sign=getattr(args, "sign", True),
+        auto_axml=getattr(args, "auto_axml", True),
+        auto_dex=getattr(args, "auto_dex", True),
+        auto_resources=getattr(args, "auto_resources", True),
+        compile_py=getattr(args, "compile_py", True),
+    )
     print(f"Successfully packaged APK: {args.output}")
+    return 0
+
+
+def cmd_sign(args: argparse.Namespace) -> int:
+    from pureapk.signature import APKSigner
+    APKSigner.sign_apk_file(args.apk_path, output_path=args.output, key_alias=args.alias)
+    out_target = args.output or args.apk_path
+    print(f"Successfully signed APK (v1+v2 schemes): {out_target}")
+    return 0
+
+
+def cmd_compile_manifest(args: argparse.Namespace) -> int:
+    from pureapk.manifest import AxmlEncoder
+    raw_xml = Path(args.input_manifest).read_bytes()
+    binary_axml = AxmlEncoder.encode(raw_xml)
+    Path(args.output).write_bytes(binary_axml)
+    print(f"Successfully compiled manifest to binary AXML ({len(binary_axml)} bytes): {args.output}")
     return 0
 
 
@@ -286,7 +312,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pureapk",
         description="High-performance pure Python APK inspection and packaging toolkit.",
     )
-    parser.add_argument("-V", "--version", action="version", version="pureapk 0.1.1")
+    parser.add_argument("-V", "--version", action="version", version="pureapk 0.1.2")
 
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 
@@ -329,6 +355,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack = subparsers.add_parser("pack", help="Build APK from directory")
     p_pack.add_argument("source_dir", help="Source folder to package")
     p_pack.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack.add_argument("--sign", action="store_true", default=True, help="Sign APK with debug keys")
+    p_pack.add_argument("--no-sign", action="store_false", dest="sign", help="Skip signing")
+    p_pack.add_argument("--no-axml", action="store_false", dest="auto_axml", help="Keep text manifest")
+    p_pack.add_argument("--no-dex", action="store_false", dest="auto_dex", help="Skip DEX injection")
+
+    # sign
+    p_sign = subparsers.add_parser("sign", help="Digitally sign an APK with v1 and v2 schemes")
+    p_sign.add_argument("apk_path", help="Path to APK to sign")
+    p_sign.add_argument("-o", "--output", help="Output signed APK path (defaults to in-place)")
+    p_sign.add_argument("--alias", default="androiddebugkey", help="Key alias")
+
+    # compile-manifest
+    p_cman = subparsers.add_parser("compile-manifest", help="Compile text AndroidManifest.xml into binary AXML")
+    p_cman.add_argument("input_manifest", help="Input XML file")
+    p_cman.add_argument("-o", "--output", required=True, help="Output binary AXML file")
 
     # init-kivy
     p_kivy = subparsers.add_parser("init-kivy", help="Scaffold a Kivy Android project")
@@ -450,7 +491,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
         "init-renpy", "pack-renpy", "init-webview", "pack-webview",
-        "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore",
+        "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore", "sign", "compile-manifest",
     }
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
     is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
@@ -493,6 +534,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-windows": cmd_init_windows,
         "pack-msix": cmd_pack_msix,
         "generate-keystore": cmd_generate_keystore,
+        "sign": cmd_sign,
+        "compile-manifest": cmd_compile_manifest,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

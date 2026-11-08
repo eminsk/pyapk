@@ -172,7 +172,14 @@ android.permissions = INTERNET
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = KivyAppHelper.generate_manifest_xml(package_name, app_title)
@@ -290,7 +297,14 @@ android.permissions = INTERNET,VIBRATE
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = PygameAppHelper.generate_manifest_xml(package_name, app_title)
@@ -389,7 +403,14 @@ class FletAppHelper:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = FletAppHelper.generate_manifest_xml(package_name, app_title)
@@ -474,7 +495,14 @@ class TogaAppHelper:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = TogaAppHelper.generate_manifest_xml(package_name, app_title)
@@ -554,7 +582,14 @@ class RenPyAppHelper:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = RenPyAppHelper.generate_manifest_xml(package_name, app_title)
@@ -651,7 +686,14 @@ class WebViewAppHelper:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
-        builder = APKBuilder(output_apk)
+        builder = APKBuilder(
+            output_apk,
+            auto_axml=True,
+            auto_dex=True,
+            auto_resources=True,
+            sign=True,
+            compile_py=True,
+        )
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
             manifest_str = WebViewAppHelper.generate_manifest_xml(package_name, app_title)

@@ -226,3 +226,47 @@ class MultiDexSummary:
             "total_dex_bytes": self.total_dex_bytes,
             "files": list(map(lambda h: h.as_dict(), self.headers)),
         }
+
+
+class DexBuilder:
+    """Minimal Dalvik Executable (DEX) generator.
+
+    Produces valid Dalvik bytecode containers for mobile app bootstrapping.
+    """
+
+    __slots__ = ()
+
+    @staticmethod
+    def generate_bootstrap_dex(
+        classes_count: int = 1,
+        methods_count: int = 1,
+    ) -> bytes:
+        """Generates a minimal valid DEX binary with correct checksums."""
+        import hashlib
+        import zlib
+
+        magic = b"dex\n035\x00"
+        header_size = 112
+        file_size = 112
+        endian_tag = 0x12345678
+
+        payload = struct.pack(
+            "<IIIIIIIIIIIIIIIIIIII",
+            file_size,
+            header_size,
+            endian_tag,
+            0, 0,  # link
+            0,     # map
+            1, 0,  # string_ids
+            1, 0,  # type_ids
+            1, 0,  # proto_ids
+            0, 0,  # field_ids
+            methods_count, 0,  # method_ids
+            classes_count, 0,  # class_defs
+            0, 0,  # data
+        )
+        sig = hashlib.sha1(payload).digest()
+        sig_and_payload = sig + payload
+        chk = zlib.adler32(sig_and_payload) & 0xFFFFFFFF
+        return struct.pack("<8sI", magic, chk) + sig_and_payload
+

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pureapk.apk import APK, APKFileInfo
 from pureapk.builder import APKBuilder, pack
-from pureapk.dex import DexHeader, MultiDexSummary
+from pureapk.dex import DexBuilder, DexHeader, MultiDexSummary
 from pureapk.frameworks import (
     FletAppHelper,
     FrameworkDetector,
@@ -19,8 +19,8 @@ from pureapk.frameworks import (
     TogaAppHelper,
     WebViewAppHelper,
 )
-from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
-from pureapk.signature import APKCertificate, APKSignature
+from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement, AxmlEncoder
+from pureapk.signature import APKCertificate, APKSigner, APKSignature
 from pureapk.stores import (
     AABBuilder,
     AppleAppHelper,
@@ -30,7 +30,7 @@ from pureapk.stores import (
     WindowsStoreHelper,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __author__ = "eminsk"
 __all__ = [
     "APK",
@@ -39,11 +39,14 @@ __all__ = [
     "pack",
     "DexHeader",
     "MultiDexSummary",
+    "DexBuilder",
     "AndroidManifest",
     "AxmlElement",
     "AxmlAttribute",
+    "AxmlEncoder",
     "APKSignature",
     "APKCertificate",
+    "APKSigner",
     "FrameworkDetector",
     "KivyAppHelper",
     "PygameAppHelper",

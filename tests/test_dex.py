@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pureapk.dex import DexHeader, MultiDexSummary
+from pureapk.dex import DexBuilder, DexHeader, MultiDexSummary
 
 
 def test_dex_header_parsing(sample_dex_bytes: bytes) -> None:
@@ -52,3 +52,16 @@ def test_multidex_summary(sample_dex_bytes: bytes) -> None:
     assert d["dex_count"] == 2
     assert d["total_classes"] == 24
     assert len(d["files"]) == 2
+
+
+def test_dex_builder_bootstrap() -> None:
+    dex_bytes = DexBuilder.generate_bootstrap_dex(classes_count=5, methods_count=10)
+    assert len(dex_bytes) == 112
+    assert dex_bytes.startswith(b"dex\n035\x00")
+
+    header = DexHeader.from_bytes(dex_bytes)
+    assert header.is_valid is True
+    assert header.version == "035"
+    assert header.class_defs_size == 5
+    assert header.method_ids_size == 10
+

@@ -484,3 +484,129 @@ class AndroidManifest:
             "application_label": self.application_label,
             "application_icon": self.application_icon,
         }
+
+
+ANDROID_NS: str = "http://schemas.android.com/apk/res/android"
+
+
+class AxmlEncoder:
+    """High-performance Android Binary XML (AXML) encoder.
+
+    Translates standard XML text into Android Binary XML (AXML)
+    compatible with Android OS AssetManager and ResourceTypes.
+    """
+
+    __slots__ = ()
+
+    @classmethod
+    def encode(cls, xml_content: Union[str, bytes]) -> bytes:
+        xml_str = {
+            True: lambda: xml_content.decode("utf-8", errors="replace"),
+            False: lambda: xml_content,
+        }[isinstance(xml_content, bytes)]()
+
+        root = ET.fromstring(xml_str)
+        strings: List[str] = []
+
+        def add_str(s: str) -> int:
+            has_str = s in strings
+            action = {
+                True: lambda: strings.index(s),
+                False: lambda: (strings.append(s), len(strings) - 1)[1],
+            }[has_str]
+            return action()
+
+        # Seed namespace strings
+        ns_prefix_idx = add_str("android")
+        ns_uri_idx = add_str(ANDROID_NS)
+
+        # Collect strings across entire tree
+        for elem in root.iter():
+            tag = elem.tag.split("}")[-1]
+            add_str(tag)
+            for k, v in elem.attrib.items():
+                attr_name = k.split("}")[-1]
+                add_str(attr_name)
+                add_str(v)
+
+        # Build string pool
+        str_offsets: List[int] = []
+        str_data = bytearray()
+        for s in strings:
+            str_offsets.append(len(str_data))
+            encoded = s.encode("utf-16le")
+            str_data.extend(struct.pack("<H", len(s)))
+            str_data.extend(encoded)
+            str_data.extend(b"\x00\x00")
+
+        pad = (4 - (len(str_data) % 4)) % 4
+        str_data.extend(b"\x00" * pad)
+
+        offsets_bytes = b"".join(struct.pack("<I", off) for off in str_offsets)
+        sp_hdr_size = 28
+        sp_chunk_size = sp_hdr_size + len(offsets_bytes) + len(str_data)
+        sp_chunk = (
+            struct.pack(
+                "<HHIIIIII",
+                0x0001,
+                sp_hdr_size,
+                sp_chunk_size,
+                len(strings),
+                0,
+                0,
+                sp_hdr_size + len(offsets_bytes),
+                0,
+            )
+            + offsets_bytes
+            + bytes(str_data)
+        )
+
+        def encode_element(elem: ET.Element) -> bytes:
+            tag = elem.tag.split("}")[-1]
+            tag_idx = strings.index(tag)
+            attrs = []
+            for k, v in elem.attrib.items():
+                attr_name = k.split("}")[-1]
+                attr_name_idx = strings.index(attr_name)
+                raw_idx = strings.index(v)
+
+                is_android = k.startswith(f"{{{ANDROID_NS}}}") or k.startswith("android:")
+                attr_ns = ns_uri_idx if is_android else 0xFFFFFFFF
+
+                if v.isdigit():
+                    val_type = TYPE_INT_DEC
+                    data_val = int(v)
+                elif v.lower() in ("true", "false"):
+                    val_type = TYPE_INT_BOOLEAN
+                    data_val = 1 if v.lower() == "true" else 0
+                else:
+                    val_type = TYPE_STRING
+                    data_val = raw_idx
+
+                attrs.append((attr_ns, attr_name_idx, raw_idx, val_type, data_val))
+
+            attr_bytes = bytearray()
+            for attr_ns, a_name_idx, raw_idx, val_type, data_val in attrs:
+                attr_bytes.extend(
+                    struct.pack("<IIIHBB I", attr_ns, a_name_idx, raw_idx, 8, 0, val_type, data_val)
+                )
+
+            extra = struct.pack("<IIHHHHHH", 0xFFFFFFFF, tag_idx, 20, 20, len(attrs), 0, 0, 0)
+            chunk_size = 16 + 20 + len(attr_bytes)
+            start_chunk = struct.pack("<HHIII", 0x0102, 16, chunk_size, 1, 0xFFFFFFFF) + extra + bytes(attr_bytes)
+
+            children_bytes = bytearray()
+            for child in elem:
+                children_bytes.extend(encode_element(child))
+
+            end_chunk = struct.pack("<HHIII", 0x0103, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", 0xFFFFFFFF, tag_idx)
+            return start_chunk + bytes(children_bytes) + end_chunk
+
+        ns_start = struct.pack("<HHIII", 0x0100, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", ns_prefix_idx, ns_uri_idx)
+        ns_end = struct.pack("<HHIII", 0x0101, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", ns_prefix_idx, ns_uri_idx)
+
+        body = ns_start + encode_element(root) + ns_end
+        total_len = 8 + len(sp_chunk) + len(body)
+        header = struct.pack("<HHI", 0x0003, 8, total_len)
+        return header + sp_chunk + body
+

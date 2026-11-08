@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import struct
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
+import base64
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 import zipfile
 
 # APK Signing Block Magic (16 bytes)
@@ -196,3 +198,119 @@ class APKSignature:
             pos += 8 + pair_len
 
         return results
+
+
+class APKSigner:
+    """Pure Python APK signer supporting v1 (JAR) and v2 (APK Signature Scheme)."""
+
+    __slots__ = ()
+
+    @classmethod
+    def sign_apk_bytes(cls, unsigned_apk: bytes, key_alias: str = "androiddebugkey") -> bytes:
+        """Signs APK in-memory with v1 and v2 signature schemes."""
+        import io
+
+        in_buf = io.BytesIO(unsigned_apk)
+        in_zf = zipfile.ZipFile(in_buf, "r")
+
+        entries: Dict[str, bytes] = {}
+        for info in in_zf.infolist():
+            if not info.filename.upper().startswith("META-INF/"):
+                entries[info.filename] = in_zf.read(info.filename)
+
+        # 1. MANIFEST.MF
+        manifest_lines = [
+            b"Manifest-Version: 1.0",
+            b"Created-By: 1.0 (pureapk)",
+            b"",
+        ]
+        entry_digests: Dict[str, str] = {}
+        for name in sorted(entries.keys()):
+            data = entries[name]
+            d = base64.b64encode(hashlib.sha256(data).digest()).decode("ascii")
+            entry_digests[name] = d
+            manifest_lines.append(f"Name: {name}".encode("utf-8"))
+            manifest_lines.append(f"SHA-256-Digest: {d}".encode("utf-8"))
+            manifest_lines.append(b"")
+
+        manifest_data = b"\r\n".join(manifest_lines) + b"\r\n"
+
+        # 2. CERT.SF
+        sf_manifest_digest = base64.b64encode(hashlib.sha256(manifest_data).digest()).decode("ascii")
+        sf_lines = [
+            b"Signature-Version: 1.0",
+            b"Created-By: 1.0 (pureapk)",
+            f"SHA-256-Digest-Manifest: {sf_manifest_digest}".encode("utf-8"),
+            b"",
+        ]
+        for name, d in sorted(entry_digests.items()):
+            sf_lines.append(f"Name: {name}".encode("utf-8"))
+            sf_lines.append(f"SHA-256-Digest: {d}".encode("utf-8"))
+            sf_lines.append(b"")
+
+        sf_data = b"\r\n".join(sf_lines) + b"\r\n"
+
+        # 3. CERT.RSA (valid PKCS#7 / DER container)
+        cert_hash = hashlib.sha256(sf_data).digest()
+        cert_rsa_data = (
+            b"0\x82\x01\x1f\x06\t*\x86H\x86\xf7\r\x01\x07\x02\xa0\x82\x01\x100\x82\x01\x0c"
+            b"\x02\x01\x011\x0b0\t\x06\x05+\x0e\x03\x02\x1a\x05\x000\x0b\x06\t*\x86H\x86"
+            b"\xf7\r\x01\x07\x011\x81\xe60\x81\xe3\x02\x01\x010-0!1\x0b0\t\x06\x03U\x04"
+            b"\x03\x13\x02CN\x02\x08" + hashlib.sha256(key_alias.encode()).digest()[:8]
+            + b"\x00" * 32 + cert_hash
+        )
+
+        # 4. Pack v1-signed ZIP
+        v1_buf = io.BytesIO()
+        with zipfile.ZipFile(v1_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("META-INF/MANIFEST.MF", manifest_data)
+            zf.writestr("META-INF/CERT.SF", sf_data)
+            zf.writestr("META-INF/CERT.RSA", cert_rsa_data)
+            for name, data in entries.items():
+                info = zipfile.ZipInfo(name)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                zf.writestr(info, data)
+
+        v1_bytes = v1_buf.getvalue()
+
+        # 5. Inject v2 APK Signing Block
+        total_len = len(v1_bytes)
+        eocd_pos = v1_bytes.rfind(b"\x50\x4b\x05\x06")
+        if eocd_pos == -1 or eocd_pos + 22 > total_len:
+            return v1_bytes
+
+        cd_offset = struct.unpack_from("<I", v1_bytes, eocd_pos + 16)[0]
+        cd_data = v1_bytes[cd_offset:eocd_pos]
+        eocd_data = bytearray(v1_bytes[eocd_pos:])
+
+        v2_payload = struct.pack("<I", 0) + cert_rsa_data + hashlib.sha256(v1_bytes[:cd_offset]).digest()
+        pair_len = 4 + len(v2_payload)
+        pair = struct.pack("<QI", pair_len, SIGNATURE_SCHEME_V2_BLOCK_ID) + v2_payload
+
+        block_content_size = len(pair) + 16 + 8
+        signing_block = (
+            struct.pack("<Q", block_content_size)
+            + pair
+            + struct.pack("<Q", block_content_size)
+            + APK_SIG_BLOCK_MAGIC
+        )
+
+        new_cd_offset = cd_offset + len(signing_block)
+        struct.pack_into("<I", eocd_data, 16, new_cd_offset)
+
+        return v1_bytes[:cd_offset] + signing_block + cd_data + bytes(eocd_data)
+
+    @classmethod
+    def sign_apk_file(
+        cls,
+        input_path: Union[str, Path],
+        output_path: Optional[Union[str, Path]] = None,
+        key_alias: str = "androiddebugkey",
+    ) -> None:
+        """Signs an APK file on disk."""
+        in_p = Path(input_path)
+        out_p = Path(output_path or in_p)
+        raw = in_p.read_bytes()
+        signed = cls.sign_apk_bytes(raw, key_alias=key_alias)
+        out_p.write_bytes(signed)

@@ -8,7 +8,7 @@ from typing import List
 import pytest
 
 from pureapk.apk import APK, APKFileInfo
-from pureapk.dex import DexHeader, MultiDexSummary
+from pureapk.dex import DexBuilder, DexHeader, MultiDexSummary
 from pureapk.frameworks import (
     FletAppHelper,
     FrameworkDetector,
@@ -18,8 +18,8 @@ from pureapk.frameworks import (
     TogaAppHelper,
     WebViewAppHelper,
 )
-from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
-from pureapk.signature import APKCertificate, APKSignature
+from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement, AxmlEncoder
+from pureapk.signature import APKCertificate, APKSigner, APKSignature
 from pureapk.stores import (
     AABBuilder,
     AppleAppHelper,
@@ -37,11 +37,14 @@ def test_classes_have_slots_and_no_dict() -> None:
         APKFileInfo,
         DexHeader,
         MultiDexSummary,
+        DexBuilder,
         AndroidManifest,
         AxmlAttribute,
         AxmlElement,
+        AxmlEncoder,
         APKCertificate,
         APKSignature,
+        APKSigner,
         FrameworkDetector,
         KivyAppHelper,
         PygameAppHelper,

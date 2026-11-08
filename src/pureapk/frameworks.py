@@ -146,15 +146,19 @@ android.permissions = INTERNET
         output_apk: Union[str, Path],
         package_name: str = "org.kivy.app",
         app_title: str = "Kivy App",
+        release: bool = False,
     ) -> None:
         """Packs a Kivy project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
+        from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
         builder = APKBuilder(output_apk)
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
-            manifest_bytes = KivyAppHelper.generate_manifest_xml(package_name, app_title).encode("utf-8")
-            builder.add_bytes("AndroidManifest.xml", manifest_bytes)
+            manifest_str = KivyAppHelper.generate_manifest_xml(package_name, app_title)
+            if release:
+                manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
+            builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
         builder.add_directory(src)
         builder.build()
 
@@ -260,14 +264,18 @@ android.permissions = INTERNET,VIBRATE
         output_apk: Union[str, Path],
         package_name: str = "org.pygame.app",
         app_title: str = "Pygame App",
+        release: bool = False,
     ) -> None:
         """Packs a Pygame project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
+        from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
         builder = APKBuilder(output_apk)
         manifest_path = src / "AndroidManifest.xml"
         if not manifest_path.exists():
-            manifest_bytes = PygameAppHelper.generate_manifest_xml(package_name, app_title).encode("utf-8")
-            builder.add_bytes("AndroidManifest.xml", manifest_bytes)
+            manifest_str = PygameAppHelper.generate_manifest_xml(package_name, app_title)
+            if release:
+                manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
+            builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
         builder.add_directory(src)
         builder.build()

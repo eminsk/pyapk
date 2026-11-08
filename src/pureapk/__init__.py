@@ -13,6 +13,14 @@ from pureapk.dex import DexHeader, MultiDexSummary
 from pureapk.frameworks import FrameworkDetector, KivyAppHelper, PygameAppHelper
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
 from pureapk.signature import APKCertificate, APKSignature
+from pureapk.stores import (
+    AABBuilder,
+    AppleAppHelper,
+    IPABuilder,
+    MSIXBuilder,
+    ReleaseHelper,
+    WindowsStoreHelper,
+)
 
 __version__ = "0.1.0"
 __author__ = "eminsk"
@@ -31,6 +39,12 @@ __all__ = [
     "FrameworkDetector",
     "KivyAppHelper",
     "PygameAppHelper",
+    "AABBuilder",
+    "IPABuilder",
+    "MSIXBuilder",
+    "ReleaseHelper",
+    "AppleAppHelper",
+    "WindowsStoreHelper",
     "load",
     "inspect",
     "__version__",

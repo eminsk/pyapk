@@ -11,6 +11,14 @@ from pureapk.apk import APK, APKFileInfo
 from pureapk.dex import DexHeader, MultiDexSummary
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement
 from pureapk.signature import APKCertificate, APKSignature
+from pureapk.stores import (
+    AABBuilder,
+    AppleAppHelper,
+    IPABuilder,
+    MSIXBuilder,
+    ReleaseHelper,
+    WindowsStoreHelper,
+)
 
 
 def test_classes_have_slots_and_no_dict() -> None:
@@ -25,6 +33,12 @@ def test_classes_have_slots_and_no_dict() -> None:
         AxmlElement,
         APKCertificate,
         APKSignature,
+        AABBuilder,
+        IPABuilder,
+        MSIXBuilder,
+        ReleaseHelper,
+        AppleAppHelper,
+        WindowsStoreHelper,
     ]
     for cls in classes:
         assert hasattr(cls, "__slots__"), f"{cls.__name__} must define __slots__"

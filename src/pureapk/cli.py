@@ -151,15 +151,77 @@ def cmd_init_pygame(args: argparse.Namespace) -> int:
 
 def cmd_pack_kivy(args: argparse.Namespace) -> int:
     from pureapk.frameworks import KivyAppHelper
-    KivyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title)
-    print(f"Successfully packaged Kivy APK: {args.output}")
+    KivyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged Kivy APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
 
 def cmd_pack_pygame(args: argparse.Namespace) -> int:
     from pureapk.frameworks import PygameAppHelper
-    PygameAppHelper.pack_app(args.source_dir, args.output, app_title=args.title)
-    print(f"Successfully packaged Pygame APK: {args.output}")
+    PygameAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False))
+    print(f"Successfully packaged Pygame APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
+    return 0
+
+
+def cmd_pack_aab(args: argparse.Namespace) -> int:
+    from pureapk.stores import AABBuilder
+    builder = AABBuilder(args.output)
+    builder.add_base_directory(args.source_dir)
+    builder.build()
+    print(f"Successfully packaged Google Play Android App Bundle (AAB): {args.output}")
+    return 0
+
+
+def cmd_init_ios(args: argparse.Namespace) -> int:
+    from pureapk.stores import AppleAppHelper
+    AppleAppHelper.init_project(args.target_dir, app_name=args.title, bundle_id=args.bundle_id)
+    print(f"Successfully initialized Apple iOS project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_ipa(args: argparse.Namespace) -> int:
+    from pureapk.stores import IPABuilder
+    builder = IPABuilder(args.output, app_name=args.title)
+    builder.add_directory(args.source_dir)
+    builder.build()
+    print(f"Successfully packaged Apple App Store IPA: {args.output}")
+    return 0
+
+
+def cmd_init_windows(args: argparse.Namespace) -> int:
+    from pureapk.stores import WindowsStoreHelper
+    WindowsStoreHelper.init_project(args.target_dir, display_name=args.title, package_name=args.package)
+    print(f"Successfully initialized Microsoft Store Windows project in: {args.target_dir}")
+    return 0
+
+
+def cmd_pack_msix(args: argparse.Namespace) -> int:
+    from pureapk.stores import MSIXBuilder
+    builder = MSIXBuilder(args.output)
+    builder.add_directory(args.source_dir)
+    builder.build()
+    print(f"Successfully packaged Microsoft Store MSIX: {args.output}")
+    return 0
+
+
+def cmd_generate_keystore(args: argparse.Namespace) -> int:
+    from pureapk.stores import ReleaseHelper
+    meta = ReleaseHelper.generate_release_keystore(
+        args.output,
+        key_alias=args.alias,
+        store_pass=args.password,
+    )
+    output_dispatch = {
+        True: lambda: _print_json(meta),
+        False: lambda: print(
+            f"Release Keystore Created: {args.output}\n"
+            f"Key Alias:                {meta['key_alias']}\n"
+            f"SHA256 Fingerprint:       {meta['sha256_fingerprint']}\n"
+            f"SHA1 Fingerprint:         {meta['sha1_fingerprint']}\n"
+            f"Validity:                 {meta['validity_days']} days"
+        ),
+    }
+    output_dispatch[args.json]()
     return 0
 
 
@@ -227,12 +289,49 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_kivy.add_argument("source_dir", help="Kivy project folder")
     p_pack_kivy.add_argument("-o", "--output", required=True, help="Output APK filename")
     p_pack_kivy.add_argument("--title", default="Kivy App", help="App title")
+    p_pack_kivy.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
 
     # pack-pygame
     p_pack_pygame = subparsers.add_parser("pack-pygame", help="Pack a Pygame project directory into an APK")
     p_pack_pygame.add_argument("source_dir", help="Pygame project folder")
     p_pack_pygame.add_argument("-o", "--output", required=True, help="Output APK filename")
     p_pack_pygame.add_argument("--title", default="Pygame App", help="App title")
+    p_pack_pygame.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
+
+    # pack-aab (Google Play Console)
+    p_pack_aab = subparsers.add_parser("pack-aab", help="Build Google Play Android App Bundle (.aab)")
+    p_pack_aab.add_argument("source_dir", help="Source folder containing project / base assets")
+    p_pack_aab.add_argument("-o", "--output", required=True, help="Output .aab bundle filename")
+
+    # init-ios (Apple App Store)
+    p_init_ios = subparsers.add_parser("init-ios", help="Scaffold an Apple iOS project with Info.plist")
+    p_init_ios.add_argument("target_dir", help="Target iOS project folder")
+    p_init_ios.add_argument("--title", default="MyIOSApp", help="App display name")
+    p_init_ios.add_argument("--bundle-id", default="com.example.app", help="Apple CFBundleIdentifier")
+
+    # pack-ipa (Apple App Store)
+    p_pack_ipa = subparsers.add_parser("pack-ipa", help="Pack an Apple App Store IPA package")
+    p_pack_ipa.add_argument("source_dir", help="Source directory containing Info.plist and app files")
+    p_pack_ipa.add_argument("-o", "--output", required=True, help="Output .ipa filename")
+    p_pack_ipa.add_argument("--title", default="PayloadApp", help="App executable / bundle title")
+
+    # init-windows (Microsoft Store)
+    p_init_win = subparsers.add_parser("init-windows", help="Scaffold a Microsoft Store Windows project")
+    p_init_win.add_argument("target_dir", help="Target Windows project folder")
+    p_init_win.add_argument("--title", default="MyWinApp", help="App display name")
+    p_init_win.add_argument("--package", default="MyCompany.MyWinApp", help="Package identity name")
+
+    # pack-msix (Microsoft Store)
+    p_pack_msix = subparsers.add_parser("pack-msix", help="Pack a Microsoft Store MSIX package with BlockMap")
+    p_pack_msix.add_argument("source_dir", help="Source directory containing AppxManifest.xml and assets")
+    p_pack_msix.add_argument("-o", "--output", required=True, help="Output .msix filename")
+
+    # generate-keystore
+    p_key = subparsers.add_parser("generate-keystore", help="Generate production release signing profile")
+    p_key.add_argument("-o", "--output", required=True, help="Output keystore filename")
+    p_key.add_argument("--alias", default="release", help="Key alias")
+    p_key.add_argument("--password", default="android", help="Store password")
+    p_key.add_argument("--json", action="store_true", help="Output metadata as JSON")
 
     return parser
 
@@ -242,10 +341,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args_list = argv if argv is not None else sys.argv[1:]
 
     # Fallback to info command if first argument is a file ending in .apk
-    has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in [
+    known_commands = {
         "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
-        "init-kivy", "init-pygame", "pack-kivy", "pack-pygame"
-    ])
+        "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
+        "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore",
+    }
+    has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
     is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
 
     effective_args = {
@@ -272,6 +373,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-pygame": cmd_init_pygame,
         "pack-kivy": cmd_pack_kivy,
         "pack-pygame": cmd_pack_pygame,
+        "pack-aab": cmd_pack_aab,
+        "init-ios": cmd_init_ios,
+        "pack-ipa": cmd_pack_ipa,
+        "init-windows": cmd_init_windows,
+        "pack-msix": cmd_pack_msix,
+        "generate-keystore": cmd_generate_keystore,
     }
 
     handler = dispatch_table.get(parsed.command, lambda a: parser.print_help() or 0)  # type: ignore[func-returns-value]

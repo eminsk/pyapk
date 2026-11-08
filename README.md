@@ -156,6 +156,58 @@ pureapk pack src_directory/ -o output.apk
 
 ---
 
+## 🎮 First-Class Kivy & Pygame Toolchains
+
+Package Kivy and Pygame applications into Android APKs on **any OS** (Windows 7/10/11, macOS, Linux) and **any Python version** without needing Linux VMs or 15 GB Android SDKs:
+
+```bash
+# Scaffold a new Kivy or Pygame mobile project
+pureapk init-kivy my_kivy_app --title "Kivy Dashboard"
+pureapk init-pygame my_pygame_app --title "Space Shooter"
+
+# Package directly into APK (Debug or Store-Ready Release)
+pureapk pack-kivy my_kivy_app -o dashboard.apk --release
+pureapk pack-pygame my_pygame_app -o shooter.apk --release
+```
+
+---
+
+## 🏬 Multi-Store Publishing (Google Play, Apple App Store, Microsoft Store)
+
+`pureapk` supports production store releases across mobile and desktop app store accounts:
+
+### 1. Google Play Console (`.aab` & Release Keystores)
+Google Play requires Android App Bundles (`.aab`) and production signing:
+```bash
+# Generate production release signing profile
+pureapk generate-keystore -o release.keystore --alias production
+
+# Build Google Play Android App Bundle (.aab)
+pureapk pack-aab my_app/ -o application.aab
+```
+
+### 2. Apple App Store (`.ipa` & `Info.plist`)
+Scaffold and bundle iOS apps ready for Apple Transporter / App Store Connect:
+```bash
+# Scaffold iOS project with Info.plist
+pureapk init-ios ios_project --title "MyIOSApp" --bundle-id "com.company.iosapp"
+
+# Pack into Apple App Store .ipa archive
+pureapk pack-ipa ios_project/ -o application.ipa --title "MyIOSApp"
+```
+
+### 3. Microsoft Windows Store (`.msix` & `AppxBlockMap.xml`)
+Scaffold and package Windows Store apps with `AppxManifest.xml` and block maps:
+```bash
+# Scaffold Windows Store project
+pureapk init-windows win_project --title "MyWinApp" --package "MyCompany.MyWinApp"
+
+# Pack into Microsoft Store .msix package with 64KB block hashing
+pureapk pack-msix win_project/ -o application.msix
+```
+
+---
+
 ## 🧪 Testing
 
 The test suite achieves **100% test pass rate** across all Python implementations and operating systems:

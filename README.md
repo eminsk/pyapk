@@ -17,7 +17,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-61%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-62%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -245,6 +245,25 @@ pureapk init-windows win_project --title "MyWinApp" --package "MyCompany.MyWinAp
 
 # Pack into Microsoft Store .msix package with 64KB block hashing
 pureapk pack-msix win_project/ -o application.msix
+```
+
+### 4. Chinese Android Stores & Multi-Channel Distribution (Huawei, Xiaomi, OPPO, Vivo, Tencent, TapTap)
+Google Play services are unavailable in mainland China. Apps are distributed through vendor stores requiring standalone release `.apk` packages (Google Play `.aab` is not accepted) with 64-bit compliance (`arm64-v8a`) and channel attribution:
+```bash
+# Pack tagged release APKs for Chinese app stores in a single command:
+pureapk pack-kivy my_app/ -o my_app_huawei.apk --channel huawei --release
+pureapk pack-kivy my_app/ -o my_app_xiaomi.apk --channel xiaomi --release
+pureapk pack-kivy my_app/ -o my_app_oppo.apk --channel oppo --release
+pureapk pack-kivy my_app/ -o my_app_vivo.apk --channel vivo --release
+pureapk pack-kivy my_app/ -o my_app_tencent.apk --channel tencent --release
+```
+Your Python app can read the active channel at runtime without any external dependencies:
+```python
+from pathlib import Path
+
+channel_file = Path("assets/channel.txt")
+store_channel = channel_file.read_text().strip() if channel_file.exists() else "generic"
+print(f"Running on store channel: {store_channel}")
 ```
 
 ---

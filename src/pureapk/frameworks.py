@@ -82,7 +82,7 @@ class FrameworkDetector:
         return "native"
 
 
-def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False) -> None:
+def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False, channel: Optional[str] = None) -> None:
     """Packages framework project folders: lib/, res/, assets/, and private python tarballs."""
     # 1. Native shared libraries (lib/ -> lib/)
     lib_dir = src / "lib"
@@ -141,6 +141,9 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
     if has_files and tar_bytes:
         builder.add_bytes("assets/private.tar", tar_bytes, compress=False)
         builder.add_bytes("assets/private.mp3", tar_bytes, compress=False)
+
+    if channel:
+        builder.add_bytes("assets/channel.txt", channel.strip().encode("utf-8"), compress=False)
 
 
 class KivyAppHelper:
@@ -236,6 +239,7 @@ android.permissions = INTERNET
         package_name: str = "org.kivy.app",
         app_title: str = "Kivy App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         """Packs a Kivy project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
@@ -258,7 +262,7 @@ android.permissions = INTERNET
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 
@@ -364,6 +368,7 @@ android.permissions = INTERNET,VIBRATE
         package_name: str = "org.pygame.app",
         app_title: str = "Pygame App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         """Packs a Pygame project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
@@ -386,7 +391,7 @@ android.permissions = INTERNET,VIBRATE
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 
@@ -474,6 +479,7 @@ class FletAppHelper:
         package_name: str = "com.flet.app",
         app_title: str = "Flet App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
@@ -495,7 +501,7 @@ class FletAppHelper:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 
@@ -569,6 +575,7 @@ class TogaAppHelper:
         package_name: str = "org.beeware.app",
         app_title: str = "Toga App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
@@ -590,7 +597,7 @@ class TogaAppHelper:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 
@@ -659,6 +666,7 @@ class RenPyAppHelper:
         package_name: str = "org.renpy.game",
         app_title: str = "Visual Novel",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
@@ -680,7 +688,7 @@ class RenPyAppHelper:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 
@@ -766,6 +774,7 @@ class WebViewAppHelper:
         package_name: str = "com.webview.app",
         app_title: str = "WebView App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
@@ -787,7 +796,7 @@ class WebViewAppHelper:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src, is_webview=True)
+        _pack_framework_project(builder, src, is_webview=True, channel=channel)
         builder.build()
 
 
@@ -867,6 +876,7 @@ class PySideAppHelper:
         package_name: str = "org.qtproject.pysideapp",
         app_title: str = "PySide App",
         release: bool = False,
+        channel: Optional[str] = None,
     ) -> None:
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
@@ -888,7 +898,7 @@ class PySideAppHelper:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-        _pack_framework_project(builder, src)
+        _pack_framework_project(builder, src, channel=channel)
         builder.build()
 
 

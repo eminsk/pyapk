@@ -119,3 +119,19 @@ def test_webview_pack_app_produces_fully_runnable_apk(tmp_path: Path) -> None:
         assert sig.is_signed is True
         assert sig.has_v1 is True
         assert sig.has_v2 is True
+
+
+
+def test_pack_app_with_channel_tag(tmp_path: Path) -> None:
+    project_dir = tmp_path / "kivy_store_app"
+    KivyAppHelper.init_project(project_dir, title="Store App")
+
+    output_huawei = tmp_path / "app_huawei.apk"
+    KivyAppHelper.pack_app(project_dir, output_huawei, channel="huawei", release=True)
+
+    assert output_huawei.exists()
+    with APK(output_huawei) as apk:
+        assert "assets/channel.txt" in apk.filenames
+        assert apk.read("assets/channel.txt") == b"huawei"
+        assert apk.signature.is_signed is True
+        assert apk.signature.has_v2 is True

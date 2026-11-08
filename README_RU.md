@@ -17,7 +17,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Ноль зависимостей](https://img.shields.io/badge/зависимости-0%20внешних-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Платформы](https://img.shields.io/badge/платформы-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Тесты](https://img.shields.io/badge/тесты-61%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Тесты](https://img.shields.io/badge/тесты-62%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Матрица](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![Лицензия: MIT](https://img.shields.io/badge/Лицензия-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -245,6 +245,25 @@ pureapk init-windows win_project --title "MyWinApp" --package "MyCompany.MyWinAp
 
 # Сборка в пакет Microsoft Store .msix с картой блоков
 pureapk pack-msix win_project/ -o application.msix
+```
+
+### 4. Китайские магазины приложений и мульти-канальная сборка (Huawei, Xiaomi, OPPO, Vivo, Tencent, TapTap)
+В Китае сервисы Google Play заблокированы. Приложения распространяются через магазины производителей устройств, где требуются классические релизные `.apk` (формат Google Play `.aab` не принимается), обязательная 64-битная архитектура (`arm64-v8a`) и канальные метки (多渠道打包):
+```bash
+# Сборка маркированных APK под каждый китайский маркет одной командой:
+pureapk pack-kivy my_app/ -o my_app_huawei.apk --channel huawei --release
+pureapk pack-kivy my_app/ -o my_app_xiaomi.apk --channel xiaomi --release
+pureapk pack-kivy my_app/ -o my_app_oppo.apk --channel oppo --release
+pureapk pack-kivy my_app/ -o my_app_vivo.apk --channel vivo --release
+pureapk pack-kivy my_app/ -o my_app_tencent.apk --channel tencent --release
+```
+Ваш Python-код может мгновенно считывать канал прямо во время выполнения:
+```python
+from pathlib import Path
+
+channel_file = Path("assets/channel.txt")
+store_channel = channel_file.read_text().strip() if channel_file.exists() else "generic"
+print(f"Запущено из магазина: {store_channel}")
 ```
 
 ---

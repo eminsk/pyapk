@@ -45,9 +45,27 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Set up Python
+        id: setup-python
+        uses: actions/setup-python@v5
+        continue-on-error: true
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
       - name: Run test suite on Python ${{ matrix.python-version }}
+        shell: bash
         run: |
-          uv run --python ${{ matrix.python-version }} --with pytest --with pytest-cov pytest -v --cov=pureapk
+          if [ "${{ steps.setup-python.outcome }}" == "success" ]; then
+            echo "Running via setup-python environment"
+            python -m pip install --upgrade pip || true
+            python -m pip install pytest pytest-cov hatchling
+            python -m pip install -e .
+            python -m pytest -v --cov=pureapk
+          else
+            echo "Running via uv standalone environment"
+            uv run --python ${{ matrix.python-version }} --with pytest --with pytest-cov pytest -v --cov=pureapk
+          fi
 
   build:
     name: Build Wheels & Source Distributions (pureapk + pyapk)

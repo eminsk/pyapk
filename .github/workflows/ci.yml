@@ -86,17 +86,11 @@ jobs:
 
       - name: Install build tools
         run: |
-          python -m pip install --upgrade pip hatchling build || true
+          python -m pip install --upgrade pip hatchling build uv || true
 
       - name: Build all wheels and sdists
         run: |
           python scripts/build_all_wheels.py
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

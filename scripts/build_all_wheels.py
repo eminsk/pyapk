@@ -66,10 +66,20 @@ packages = ["src/pureapk", "src/pyapk"]
 """
 
 
+def _run_build() -> None:
+    if shutil.which("uv"):
+        try:
+            subprocess.run(["uv", "build"], cwd=ROOT, check=True)
+            return
+        except Exception as e:
+            print(f"uv build failed ({e}), falling back to python -m build")
+    subprocess.run([sys.executable, "-m", "build"], cwd=ROOT, check=True)
+
+
 def build_package(name: str) -> None:
     print(f"=== Building {name} ===")
     if name == "pureapk":
-        subprocess.run(["uv", "build"], cwd=ROOT, check=True)
+        _run_build()
     elif name == "pyapk":
         # Temporarily swap pyproject.toml
         backup_toml = ROOT / "pyproject.toml.bak"
@@ -77,7 +87,7 @@ def build_package(name: str) -> None:
         try:
             PYPROJECT_PYAPK.write_text(PYAPK_TOML_CONTENT, encoding="utf-8")
             shutil.copy2(PYPROJECT_PYAPK, PYPROJECT_PUREAPK)
-            subprocess.run(["uv", "build"], cwd=ROOT, check=True)
+            _run_build()
         finally:
             shutil.copy2(backup_toml, PYPROJECT_PUREAPK)
             if backup_toml.exists():

@@ -135,3 +135,30 @@ def test_pack_app_with_channel_tag(tmp_path: Path) -> None:
         assert apk.read("assets/channel.txt") == b"huawei"
         assert apk.signature.is_signed is True
         assert apk.signature.has_v2 is True
+
+
+def test_kivy_pack_app_with_custom_dex_and_arsc(tmp_path: Path) -> None:
+    """Tests packaging when project includes pre-compiled multi-dex files and resources.arsc."""
+    project_dir = tmp_path / "kivy_multidex"
+    KivyAppHelper.init_project(project_dir, title="MultiDex Kivy App")
+
+    # Add custom dex and arsc at root
+    (project_dir / "classes.dex").write_bytes(b"dex\n035\x00" + b"\x00" * 104)
+    (project_dir / "classes2.dex").write_bytes(b"dex\n035\x00" + b"\x00" * 104)
+    (project_dir / "resources.arsc").write_bytes(b"\x02\x00\x0c\x00" + b"\x00" * 8)
+
+    output_apk = tmp_path / "multidex_kivy.apk"
+    KivyAppHelper.pack_app(project_dir, output_apk)
+
+    with APK(output_apk) as apk:
+        # Verify custom dex and arsc are at root of APK
+        assert "classes.dex" in apk.filenames
+        assert "classes2.dex" in apk.filenames
+        assert "resources.arsc" in apk.filenames
+
+        # Verify custom dex and arsc are NOT inside private.tar
+        tar_bytes = apk.read("assets/private.tar")
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tf:
+            tar_names = tf.getnames()
+            assert not any(n.endswith(".dex") for n in tar_names)
+            assert "resources.arsc" not in tar_names

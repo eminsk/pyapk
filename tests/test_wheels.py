@@ -147,8 +147,8 @@ def test_build_wheel_multi_python_versions(tmp_path: Path) -> None:
     src_dir.mkdir()
     (src_dir / "app.py").write_text("print('test')\n", encoding="utf-8")
 
-    # Test all target Python versions from 3.8 up to 3.14
-    for py_tag in ("cp38", "cp39", "cp310", "cp311", "cp312", "cp313", "cp314"):
+    # Test all target Python versions from 3.8 up to 3.16 (including 3.16t No-GIL)
+    for py_tag in ("cp38", "cp39", "cp310", "cp311", "cp312", "cp313", "cp314", "cp315", "cp316", "cp316t"):
         res = AndroidWheelHelper.build_wheel(
             src_dir,
             output_whl=tmp_path / "dist",

@@ -561,7 +561,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_wheel.add_argument("-o", "--output", help="Output .whl file path or destination directory")
     p_pack_wheel.add_argument("-n", "--name", required=True, help="Distribution name (e.g. my-app)")
     p_pack_wheel.add_argument("-v", "--version", default="0.1.0", help="Distribution version (default: 0.1.0)")
-    p_pack_wheel.add_argument("--python-tag", default="py3", help="Python version tag (e.g. py3, cp38, cp39, cp310, cp311, cp312, cp313)")
+    p_pack_wheel.add_argument("--python-tag", default="py3", help="Python version tag (e.g. py3, cp38, cp39, cp310, cp311, cp312, cp313, cp314, cp315, cp316)")
     p_pack_wheel.add_argument("--abi", help="Target ABI (e.g. arm64-v8a, armeabi-v7a, x86_64, x86, any)")
     p_pack_wheel.add_argument("--summary", default="Mobile Python package", help="Package summary description")
     p_pack_wheel.add_argument("--json", action="store_true", help="Output results as JSON")

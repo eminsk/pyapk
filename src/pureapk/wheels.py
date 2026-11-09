@@ -212,7 +212,7 @@ class AndroidWheelHelper:
 
         Supports:
         - Pure Python: py3-none-any.whl, py2.py3-none-any.whl
-        - Specific CPython versions: cp38, cp39, cp310, cp311, cp312, cp313, cp314
+        - Specific CPython versions: cp38, cp39, cp310, cp311, cp312, cp313, cp314, cp315, cp316, cp316t
         - Target mobile architectures: arm64-v8a, armeabi-v7a, x86_64, x86
         """
         src = Path(source_dir)

@@ -176,7 +176,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
     if lib_dir.is_dir():
 
-        builder.add_directory(lib_dir, prefix="lib")
+        builder.add_directory(lib_dir, prefix="lib", compress=True)
 
 
 
@@ -266,9 +266,19 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
         has_files = False
 
+        excluded_top = ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__", ".pytest_cache", ".idea", ".vscode", "dist", "build", "tests")
         with tarfile.open(fileobj=tar_buf, mode="w:gz") as tf:
 
-            for root, _, files in os.walk(src):
+            for root, dirs, files in os.walk(src):
+
+                dirs[:] = [d for d in dirs if d not in excluded_top and not d.endswith((".dist-info", ".egg-info"))]
+
+                # Explicitly add directory entries so jtar/AssetExtract creates subfolders
+                if Path(root) != src:
+                    rel_dir = Path(root).relative_to(src)
+                    if rel_dir.parts[0] not in excluded_top:
+                        rel_dir_str = str(rel_dir).replace("\\", "/")
+                        tf.add(str(root), arcname=rel_dir_str, recursive=False)
 
                 for f in files:
 
@@ -278,7 +288,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
                     rel_parts = rel_f.parts
 
-                    if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__", ".pytest_cache", ".idea", ".vscode", "dist", "build", "tests") or rel_parts[0].endswith((".dist-info", ".egg-info")):
+                    if rel_parts[0] in excluded_top or rel_parts[0].endswith((".dist-info", ".egg-info")):
 
                         continue
 

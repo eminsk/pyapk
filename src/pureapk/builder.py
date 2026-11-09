@@ -114,7 +114,7 @@ class APKBuilder:
         self._entries.append((norm_name, final_data, compression_type))
         return self
 
-    def add_file(self, local_path: Union[str, Path], archive_name: Optional[str] = None) -> APKBuilder:
+    def add_file(self, local_path: Union[str, Path], archive_name: Optional[str] = None, compress: Optional[bool] = None) -> APKBuilder:
         path_obj = Path(local_path)
         arc_name = archive_name or path_obj.name
         with open(path_obj, "rb") as f:
@@ -130,16 +130,16 @@ class APKBuilder:
             except Exception:
                 pass
 
-        return self.add_bytes(arc_name, data)
+        return self.add_bytes(arc_name, data, compress=compress)
 
-    def add_directory(self, local_dir: Union[str, Path], prefix: str = "") -> APKBuilder:
+    def add_directory(self, local_dir: Union[str, Path], prefix: str = "", compress: Optional[bool] = None) -> APKBuilder:
         base = Path(local_dir)
         for root, _, files in os.walk(base):
             for file in files:
                 full_path = Path(root) / file
                 rel_path = full_path.relative_to(base)
                 arc_path = f"{prefix}/{rel_path}".lstrip("/") if prefix else str(rel_path)
-                self.add_file(full_path, arc_path)
+                self.add_file(full_path, arc_path, compress=compress)
         return self
 
     def build(self) -> None:

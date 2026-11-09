@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pureapk"
-version = "1.0.1"
+version = "1.0.2"
 description = "High-performance pure Python APK inspection, multi-store packager, and framework toolchain with zero dependencies."
 readme = "README.md"
 license = { text = "MIT" }
@@ -70,9 +70,11 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/eminsk/pureapk"
-Repository = "https://github.com/eminsk/pureapk.git"
-Issues = "https://github.com/eminsk/pureapk/issues"
+Homepage = "https://eminsk.github.io/#pureapk"
+Documentation = "https://github.com/eminsk/pyapk#readme"
+Repository = "https://github.com/eminsk/pyapk"
+Issues = "https://github.com/eminsk/pyapk/issues"
+Changelog = "https://github.com/eminsk/pyapk/releases"
 
 [project.scripts]
 pureapk = "pureapk.cli:main"

@@ -166,6 +166,35 @@ class FrameworkDetector:
 
 
 
+def patch_arsc_private_version(arsc: bytes, new_version: str) -> bytes:
+
+    """Replace the 40-char SHA1 ``private_version`` value inside a p4a resources.arsc.
+
+    p4a stores ``private_version`` as a 40-hex-digit string in the UTF-8 global
+    string pool (encoded as ``0x28 0x28 <40 bytes> 0x00``). The replacement has the
+    same length, so the pool layout and all offsets stay intact. Returns the input
+    unchanged when no unique candidate is found.
+
+    """
+
+    import re
+
+    if len(new_version) != 40 or not re.fullmatch(r"[0-9a-f]{40}", new_version):
+
+        raise ValueError("new_version must be a 40-char lowercase hex string")
+
+    matches = list(re.finditer(rb"\x28\x28([0-9a-f]{40})\x00", arsc))
+
+    if len(matches) != 1:
+
+        return arsc
+
+    start, end = matches[0].span(1)
+
+    return arsc[:start] + new_version.encode("ascii") + arsc[end:]
+
+
+
 def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False, channel: Optional[str] = None) -> None:
 
     """Packages framework project folders: lib/, res/, assets/, root DEX/resources, and private python tarballs."""
@@ -192,11 +221,21 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
     # 3. Root DEX files and compiled resources table (classes*.dex, resources.arsc)
 
+    arsc_bytes: Optional[bytes] = None
+
+    private_tar_bytes: Optional[bytes] = None
+
     for entry in src.iterdir():
 
         if entry.is_file():
 
-            if entry.name.endswith(".dex") or entry.name == "resources.arsc":
+            if entry.name == "resources.arsc":
+
+                # Deferred: private_version is patched once private.tar is known (see step 6)
+
+                arsc_bytes = entry.read_bytes()
+
+            elif entry.name.endswith(".dex"):
 
                 builder.add_file(entry, entry.name)
 
@@ -233,6 +272,8 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
                         data = gzip.compress(data)
 
                     builder.add_bytes(arc_name, data, compress=False)
+
+                    private_tar_bytes = data
 
                 else:
 
@@ -350,6 +391,25 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
             builder.add_bytes("assets/private.tar", tar_bytes, compress=False)
             builder.add_bytes("assets/private.mp3", tar_bytes, compress=False)
+
+            private_tar_bytes = tar_bytes
+
+
+
+    # 6. resources.arsc with "private_version" bound to the private.tar content.
+    # p4a's PythonUtil.unpackAsset() re-extracts private.tar only when the
+    # "private_version" string resource differs from the on-device app/.version,
+    # so a constant value makes app updates silently keep stale (or broken) files.
+
+    if arsc_bytes is not None:
+
+        if private_tar_bytes:
+
+            import hashlib
+
+            arsc_bytes = patch_arsc_private_version(arsc_bytes, hashlib.sha1(private_tar_bytes).hexdigest())
+
+        builder.add_bytes("resources.arsc", arsc_bytes, compress=False)
 
 
 

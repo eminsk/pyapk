@@ -200,6 +200,100 @@ class APKSignature:
         return results
 
 
+# ---------------------------------------------------------------------------
+# Android Debug Keystore Assets & Pure Python Cryptographic Signers
+# ---------------------------------------------------------------------------
+_DEBUG_CERT_DER = base64.b64decode("MIIDUTCCAjmgAwIBAgIUHJmtvm48jk0gUS8z1QK+rm5Dk54wDQYJKoZIhvcNAQELBQAwNzEWMBQGA1UEAwwNQW5kcm9pZCBEZWJ1ZzEQMA4GA1UECgwHQW5kcm9pZDELMAkGA1UEBhMCVVMwIBcNMjYxMTA5MDg0NTM3WhgPMjA1NDAzMjcwODQ1MzdaMDcxFjAUBgNVBAMMDUFuZHJvaWQgRGVidWcxEDAOBgNVBAoMB0FuZHJvaWQxCzAJBgNVBAYTAlVTMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx19ugWURtUiDt4t01Wi5RNKKdikypLzrcpOhCtJihD9ytbTI2txijytkGEDxuT58RF8YLbA4fidl037ns+4m2A3koz1ZZ7KORjZNM6Pgaal77YjrphN8NiNn4zdCa0X9lUIg0qmlFi1WrtSiaZYltB3kD0SmkSg43rNJg6eoC4cdYbPq4GmE+w3AePzNYviQD1C3bWFny67DN3AYXx9/QANO7g2K0X9In0isUDsypna8CoSmO7DdJ29J+l9vp7tSzw6OzU3T5UzSoAGNy3MBDZ2lhVWjFiGBhjxnT54ieMDhquyg1SmPRmeUDFOUHAt/3JYLRHKtpMjJqW/EfktKswIDAQABo1MwUTAdBgNVHQ4EFgQUCYGF3o6itaaKj19+4/KmfB3+9DkwHwYDVR0jBBgwFoAUCYGF3o6itaaKj19+4/KmfB3+9DkwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAt3OAz8/awUFt27EZRm8R5/GCq3nTHjRTM7ifNSFwMIrBXnIUuSGD7TZJR1wT/ee4XWEX8pDGC4jo7FpKBjfzqLMrNzwUT5exPdMlek03JL6rNy4TfcPUc0wxBuYFiMdZvhOsGfpOmNRR7FpNuMxETL+CgD+dT9PdXUZL/TsiUVlrjSRi1HNBRsc8HLefpWhROid6dwnlQ1yPNVVzpIyKwU4gDZK92NyrRv14dmA8y1gyO4kW8BIWxHIIf7SAH7gAvLxw9RBCSorURaNJaMfhDF0u6bHW/XuiGXQUOS/Uum3hRrh5hQshhIe9/N2SUkUf63qe0xX65M9jQpD6QsXSiA==")
+_DEBUG_PUBKEY_DER = base64.b64decode("MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAx19ugWURtUiDt4t01Wi5RNKKdikypLzrcpOhCtJihD9ytbTI2txijytkGEDxuT58RF8YLbA4fidl037ns+4m2A3koz1ZZ7KORjZNM6Pgaal77YjrphN8NiNn4zdCa0X9lUIg0qmlFi1WrtSiaZYltB3kD0SmkSg43rNJg6eoC4cdYbPq4GmE+w3AePzNYviQD1C3bWFny67DN3AYXx9/QANO7g2K0X9In0isUDsypna8CoSmO7DdJ29J+l9vp7tSzw6OzU3T5UzSoAGNy3MBDZ2lhVWjFiGBhjxnT54ieMDhquyg1SmPRmeUDFOUHAt/3JYLRHKtpMjJqW/EfktKswIDAQAB")
+_DEBUG_RSA_N = 25168481794649406176310476305279767236605887268730577192632299247054249586396065052277190396522660808731369021603079207202996852335395710412105855439145674685311293720152228108417243498194995190777446671120864640703403838794840270264212092431112733089935881949934600381365058475398562681946376557119893827726132967760343316281002158152608992416564318194977918599143428183814635469865546804410153067678625201525169753299828928859709863892685469541233197141836746102744673378822686813704858452452915363865967517872367117444936896870708925683527552552021269140429343395053948518819167362647228836861832450756931886992051
+_DEBUG_RSA_D = 11984762738705179413876271255886267849251235591176121698263156365906976119862904925750956243030363568495417836362331116144887991047146827481968864666022836607440868498278081979544854455802375946658943299037251983989982380932755202927665271137585648075196820665465066167225385085844647220605788278473520097483152883244296315096755441511709932850135222994555902158564458459843211024579396923212859509639857471230257110943828593764779490304835048855583641644929120618158986612930713859219803382360795291360416237416667750848202301984013520297912290194071327252060395781867527377972252218140062577863321873708434437828493
+
+
+def _asn1_len(n: int) -> bytes:
+    if n < 128:
+        return bytes([n])
+    b = n.to_bytes((n.bit_length() + 7) // 8, "big")
+    return bytes([0x80 | len(b)]) + b
+
+
+def _asn1_tag(tag: int, val: bytes) -> bytes:
+    return bytes([tag]) + _asn1_len(len(val)) + val
+
+
+def _asn1_int(val: int) -> bytes:
+    b = val.to_bytes((val.bit_length() + 8) // 8, "big")
+    return _asn1_tag(0x02, b)
+
+
+def _len_prefixed(data: bytes) -> bytes:
+    return struct.pack("<I", len(data)) + data
+
+
+def _rsa_sign_sha256(data: bytes, n: int, d: int) -> bytes:
+    """Computes an RSA PKCS#1 v1.5 signature with SHA-256 in pure Python."""
+    h = hashlib.sha256(data).digest()
+    digest_info = (
+        b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20"
+        + h
+    )
+    pad_len = 256 - 3 - len(digest_info)
+    padded = b"\x00\x01" + (b"\xff" * pad_len) + b"\x00" + digest_info
+    sig_int = pow(int.from_bytes(padded, "big"), d, n)
+    return sig_int.to_bytes(256, "big")
+
+
+def _build_pkcs7_der(sf_data: bytes, cert_der: bytes, n: int, d: int) -> bytes:
+    """Builds a standard, RFC 2315 compliant detached PKCS#7 SignedData structure."""
+    # Extract issuer and serialNumber from certificate DER
+    tbs_pos = 2 + (cert_der[1] & 0x7F if cert_der[1] & 0x80 else 0)
+    inner_pos = tbs_pos + 2 + (cert_der[tbs_pos + 1] & 0x7F if cert_der[tbs_pos + 1] & 0x80 else 0)
+    # Skip version [0]
+    inner_pos += 2 + cert_der[inner_pos + 1]
+    # Extract serialNumber
+    s_len = cert_der[inner_pos + 1]
+    serial_bytes = cert_der[inner_pos:inner_pos + 2 + s_len]
+    inner_pos += 2 + s_len
+    # Skip sigAlg
+    sig_len = cert_der[inner_pos + 1]
+    if sig_len & 0x80:
+        nb = sig_len & 0x7F
+        sig_len = int.from_bytes(cert_der[inner_pos + 2:inner_pos + 2 + nb], "big")
+        inner_pos += 2 + nb + sig_len
+    else:
+        inner_pos += 2 + sig_len
+    # Extract issuer
+    iss_len = cert_der[inner_pos + 1]
+    if iss_len & 0x80:
+        nb = iss_len & 0x7F
+        iss_len = int.from_bytes(cert_der[inner_pos + 2:inner_pos + 2 + nb], "big")
+        issuer_bytes = cert_der[inner_pos:inner_pos + 2 + nb + iss_len]
+    else:
+        issuer_bytes = cert_der[inner_pos:inner_pos + 2 + iss_len]
+
+    sig_bytes = _rsa_sign_sha256(sf_data, n, d)
+    issuer_and_serial = _asn1_tag(0x30, issuer_bytes + serial_bytes)
+    sha256_alg = bytes.fromhex("300d06096086480165030402010500")
+    rsa_alg = bytes.fromhex("300d06092a864886f70d0101010500")
+    enc_digest = _asn1_tag(0x04, sig_bytes)
+
+    signer_info = _asn1_tag(
+        0x30,
+        _asn1_int(1) + issuer_and_serial + sha256_alg + rsa_alg + enc_digest
+    )
+    signer_infos = _asn1_tag(0x31, signer_info)
+    certs_set = _asn1_tag(0xA0, cert_der)
+    pkcs7_data_oid = bytes.fromhex("06092a864886f70d010701")
+    content_info = _asn1_tag(0x30, pkcs7_data_oid)
+    digest_algorithms = _asn1_tag(0x31, sha256_alg)
+
+    signed_data = _asn1_tag(
+        0x30,
+        _asn1_int(1) + digest_algorithms + content_info + certs_set + signer_infos
+    )
+    pkcs7_signed_data_oid = bytes.fromhex("06092a864886f70d010702")
+    return _asn1_tag(0x30, pkcs7_signed_data_oid + _asn1_tag(0xA0, signed_data))
+
+
 class APKSigner:
     """Pure Python APK signer supporting v1 (JAR) and v2 (APK Signature Scheme) with alignment preservation."""
 
@@ -212,6 +306,7 @@ class APKSigner:
         key_alias: str = "androiddebugkey",
         alignment: int = 4,
         so_alignment: int = 16384,
+        v2: bool = True,
     ) -> bytes:
         """Signs APK in-memory with v1 and v2 signature schemes, ensuring uncompressed entries remain 4B/16KB aligned."""
         import io
@@ -228,7 +323,7 @@ class APKSigner:
         # 1. MANIFEST.MF
         manifest_lines = [
             b"Manifest-Version: 1.0",
-            b"Created-By: 1.0 (pureapk)",
+            b"Created-By: 1.0 (Android)",
             b"",
         ]
         entry_digests: Dict[str, str] = {}
@@ -246,7 +341,7 @@ class APKSigner:
         sf_manifest_digest = base64.b64encode(hashlib.sha256(manifest_data).digest()).decode("ascii")
         sf_lines = [
             b"Signature-Version: 1.0",
-            b"Created-By: 1.0 (pureapk)",
+            b"Created-By: 1.0 (Android)",
             f"SHA-256-Digest-Manifest: {sf_manifest_digest}".encode("utf-8"),
             b"",
         ]
@@ -257,15 +352,8 @@ class APKSigner:
 
         sf_data = b"\r\n".join(sf_lines) + b"\r\n"
 
-        # 3. CERT.RSA (valid PKCS#7 / DER container)
-        cert_hash = hashlib.sha256(sf_data).digest()
-        cert_rsa_data = (
-            b"0\x82\x01\x1f\x06\t*\x86H\x86\xf7\r\x01\x07\x02\xa0\x82\x01\x100\x82\x01\x0c"
-            b"\x02\x01\x011\x0b0\t\x06\x05+\x0e\x03\x02\x1a\x05\x000\x0b\x06\t*\x86H\x86"
-            b"\xf7\r\x01\x07\x011\x81\xe60\x81\xe3\x02\x01\x010-0!1\x0b0\t\x06\x03U\x04"
-            b"\x03\x13\x02CN\x02\x08" + hashlib.sha256(key_alias.encode()).digest()[:8]
-            + b"\x00" * 32 + cert_hash
-        )
+        # 3. CERT.RSA (valid, cryptographically verified PKCS#7 container with X.509 Certificate)
+        cert_rsa_data = _build_pkcs7_der(sf_data, _DEBUG_CERT_DER, _DEBUG_RSA_N, _DEBUG_RSA_D)
 
         # 4. Pack v1-signed ZIP with page alignment
         v1_buf = io.BytesIO()
@@ -279,6 +367,7 @@ class APKSigner:
                 minfo.compress_type = zipfile.ZIP_DEFLATED
                 minfo.external_attr = 0o644 << 16
                 zf.writestr(minfo, meta_data)
+
             for name in sorted(entries.keys()):
                 old_info, data = entries[name]
                 info = zipfile.ZipInfo(old_info.filename)
@@ -290,20 +379,50 @@ class APKSigner:
                 zf.writestr(info, data)
 
         v1_bytes = v1_buf.getvalue()
+        if not v2:
+            return v1_bytes
 
-        # 5. Inject v2 APK Signing Block
+        # 5. Inject v2 APK Signing Block (Official Android APK Signature Scheme v2)
         total_len = len(v1_bytes)
         eocd_pos = v1_bytes.rfind(b"\x50\x4b\x05\x06")
         if eocd_pos == -1 or eocd_pos + 22 > total_len:
             return v1_bytes
 
         cd_offset = struct.unpack_from("<I", v1_bytes, eocd_pos + 16)[0]
-        cd_data = v1_bytes[cd_offset:eocd_pos]
+        part1 = v1_bytes[:cd_offset]
+        part2 = v1_bytes[cd_offset:eocd_pos]
         eocd_data = bytearray(v1_bytes[eocd_pos:])
 
-        v2_payload = struct.pack("<I", 0) + cert_rsa_data + hashlib.sha256(v1_bytes[:cd_offset]).digest()
-        pair_len = 4 + len(v2_payload)
-        pair = struct.pack("<QI", pair_len, SIGNATURE_SCHEME_V2_BLOCK_ID) + v2_payload
+        # Compute v2 Merkle tree content digest (0x0103 = SHA256withRSA)
+        chunk_size = 1048576  # 1MB
+        chunks = []
+        struct.pack_into("<I", eocd_data, 16, cd_offset)
+        part3 = bytes(eocd_data)
+
+        for part in (part1, part2, part3):
+            for i in range(0, len(part), chunk_size):
+                chunk = part[i : i + chunk_size]
+                h = hashlib.sha256(b"\x5a" + struct.pack("<I", len(chunk)) + chunk).digest()
+                chunks.append(h)
+
+        content_digest = hashlib.sha256(b"\xa5" + struct.pack("<I", len(chunks)) + b"".join(chunks)).digest()
+
+        # v2 SignedData structure: digests + certs + additional attributes
+        digests_seq = _len_prefixed(_len_prefixed(struct.pack("<I", 0x0103) + _len_prefixed(content_digest)))
+        certs_seq = _len_prefixed(_len_prefixed(_DEBUG_CERT_DER))
+        attrs_seq = _len_prefixed(b"")
+        v2_signed_data = _len_prefixed(digests_seq + certs_seq + attrs_seq)
+
+        # v2 Signature: RSA PKCS#1 v1.5 over v2_signed_data
+        v2_sig = _rsa_sign_sha256(v2_signed_data, _DEBUG_RSA_N, _DEBUG_RSA_D)
+        signatures_seq = _len_prefixed(_len_prefixed(struct.pack("<I", 0x0103) + _len_prefixed(v2_sig)))
+        public_key_seq = _len_prefixed(_DEBUG_PUBKEY_DER)
+
+        signer_data = _len_prefixed(v2_signed_data + signatures_seq + public_key_seq)
+        signers_seq = _len_prefixed(signer_data)
+
+        pair_len = 4 + len(signers_seq)
+        pair = struct.pack("<QI", pair_len, SIGNATURE_SCHEME_V2_BLOCK_ID) + signers_seq
 
         block_content_size = len(pair) + 16 + 8
         signing_block = (
@@ -316,7 +435,7 @@ class APKSigner:
         new_cd_offset = cd_offset + len(signing_block)
         struct.pack_into("<I", eocd_data, 16, new_cd_offset)
 
-        return v1_bytes[:cd_offset] + signing_block + cd_data + bytes(eocd_data)
+        return part1 + signing_block + part2 + bytes(eocd_data)
 
     @classmethod
     def sign_apk_file(
@@ -326,6 +445,7 @@ class APKSigner:
         key_alias: str = "androiddebugkey",
         alignment: int = 4,
         so_alignment: int = 16384,
+        v2: bool = True,
     ) -> None:
         """Signs an APK file on disk."""
         in_p = Path(input_path)
@@ -336,5 +456,6 @@ class APKSigner:
             key_alias=key_alias,
             alignment=alignment,
             so_alignment=so_alignment,
+            v2=v2,
         )
         out_p.write_bytes(signed)

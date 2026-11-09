@@ -187,3 +187,14 @@ def test_flet_toga_renpy_webview_helpers(tmp_path: Path) -> None:
         assert "org.qtproject.qt.android.bindings.QtActivity" in apk.manifest.activities
         assert apk.framework == "pyside"
         assert apk.signature.is_signed is True
+
+def test_cli_pack_frameworks_with_custom_package(tmp_path: Path) -> None:
+    k_dir = tmp_path / "custom_k_src"
+    KivyAppHelper.init_project(k_dir)
+    k_apk = str(tmp_path / "custom_k.apk")
+
+    code_k = main(["pack-kivy", str(k_dir), "-o", k_apk, "--title", "CustomApp", "-p", "com.custom.weather"])
+    assert code_k == 0
+    with APK(k_apk) as apk:
+        assert apk.package_name == "com.custom.weather"
+        assert apk.manifest.package_name == "com.custom.weather"

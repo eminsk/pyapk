@@ -95,7 +95,7 @@ def test_cli_direct_apk_argument(sample_apk_file: str, capsys: pytest.CaptureFix
 def test_cli_pyapk_entrypoint() -> None:
     import pyapk
     assert pyapk.APK is not None
-    assert pyapk.__version__ == "1.0.1"
+    assert pyapk.__version__ == "1.0.2"
 
 
 def test_cli_framework_subcommands(tmp_path: Path) -> None:

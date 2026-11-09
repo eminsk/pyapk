@@ -576,9 +576,19 @@ class AxmlEncoder:
                 if v.isdigit():
                     val_type = TYPE_INT_DEC
                     data_val = int(v)
+                elif v.startswith("-") and v[1:].isdigit():
+                    val_type = TYPE_INT_DEC
+                    data_val = int(v) & 0xFFFFFFFF
                 elif v.lower() in ("true", "false"):
                     val_type = TYPE_INT_BOOLEAN
                     data_val = 1 if v.lower() == "true" else 0
+                elif v.startswith(("0x", "0X")):
+                    try:
+                        val_type = TYPE_INT_HEX
+                        data_val = int(v, 16) & 0xFFFFFFFF
+                    except ValueError:
+                        val_type = TYPE_STRING
+                        data_val = raw_idx
                 else:
                     val_type = TYPE_STRING
                     data_val = raw_idx

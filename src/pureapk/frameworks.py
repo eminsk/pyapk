@@ -117,9 +117,11 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
                 full_f = Path(root) / f
                 rel_f = full_f.relative_to(src)
                 rel_parts = rel_f.parts
-                if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__") or rel_parts[0].endswith((".dist-info", ".egg-info")):
+                if rel_parts[0] in ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__", ".pytest_cache", ".idea", ".vscode", "dist", "build") or rel_parts[0].endswith((".dist-info", ".egg-info")):
                     continue
                 if rel_parts[0] in ("AndroidManifest.xml", "buildozer.spec", ".lock"):
+                    continue
+                if f.endswith((".apk", ".aab", ".ipa", ".msix", ".pyc")):
                     continue
                 rel_str = str(rel_f).replace("\\", "/")
                 tf.add(str(full_f), arcname=rel_str)
@@ -236,15 +238,42 @@ android.permissions = INTERNET
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "org.kivy.app",
-        app_title: str = "Kivy App",
+        package_name: Optional[str] = None,
+        app_title: Optional[str] = None,
         release: bool = False,
         channel: Optional[str] = None,
+        orientation: Optional[str] = None,
     ) -> None:
         """Packs a Kivy project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
+
+        spec_file = src / "buildozer.spec"
+        spec_title = None
+        spec_pkg = None
+        spec_orientation = "portrait"
+        if spec_file.exists():
+            try:
+                import configparser
+                cfg = configparser.ConfigParser()
+                cfg.read(str(spec_file), encoding="utf-8")
+                if "app" in cfg:
+                    spec_title = cfg["app"].get("title")
+                    p_name = cfg["app"].get("package.name")
+                    p_dom = cfg["app"].get("package.domain")
+                    if p_name and p_dom:
+                        spec_pkg = f"{p_dom}.{p_name}"
+                    elif p_name:
+                        spec_pkg = p_name
+                    spec_orientation = cfg["app"].get("orientation", "portrait")
+            except Exception:
+                pass
+
+        final_title = app_title or spec_title or "Kivy App"
+        final_pkg = package_name or spec_pkg or "org.kivy.app"
+        final_orient = orientation or spec_orientation or "portrait"
+
         builder = APKBuilder(
             output_apk,
             auto_axml=True,
@@ -257,7 +286,11 @@ android.permissions = INTERNET
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = KivyAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = KivyAppHelper.generate_manifest_xml(
+                final_pkg,
+                final_title,
+                orientation=final_orient,
+            )
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -365,15 +398,42 @@ android.permissions = INTERNET,VIBRATE
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "org.pygame.app",
-        app_title: str = "Pygame App",
+        package_name: Optional[str] = None,
+        app_title: Optional[str] = None,
         release: bool = False,
         channel: Optional[str] = None,
+        orientation: Optional[str] = None,
     ) -> None:
         """Packs a Pygame project directory into a standard Android APK."""
         from pureapk.builder import APKBuilder
         from pureapk.stores import ReleaseHelper
         src = Path(source_dir)
+
+        spec_file = src / "buildozer.spec"
+        spec_title = None
+        spec_pkg = None
+        spec_orientation = "landscape"
+        if spec_file.exists():
+            try:
+                import configparser
+                cfg = configparser.ConfigParser()
+                cfg.read(str(spec_file), encoding="utf-8")
+                if "app" in cfg:
+                    spec_title = cfg["app"].get("title")
+                    p_name = cfg["app"].get("package.name")
+                    p_dom = cfg["app"].get("package.domain")
+                    if p_name and p_dom:
+                        spec_pkg = f"{p_dom}.{p_name}"
+                    elif p_name:
+                        spec_pkg = p_name
+                    spec_orientation = cfg["app"].get("orientation", "landscape")
+            except Exception:
+                pass
+
+        final_title = app_title or spec_title or "Pygame App"
+        final_pkg = package_name or spec_pkg or "org.pygame.app"
+        final_orient = orientation or spec_orientation or "landscape"
+
         builder = APKBuilder(
             output_apk,
             auto_axml=True,
@@ -386,7 +446,11 @@ android.permissions = INTERNET,VIBRATE
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = PygameAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = PygameAppHelper.generate_manifest_xml(
+                final_pkg,
+                final_title,
+                orientation=final_orient,
+            )
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -476,7 +540,7 @@ class FletAppHelper:
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "com.flet.app",
+        package_name: Optional[str] = None,
         app_title: str = "Flet App",
         release: bool = False,
         channel: Optional[str] = None,
@@ -496,7 +560,7 @@ class FletAppHelper:
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = FletAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = FletAppHelper.generate_manifest_xml(package_name or "com.flet.app", app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -572,7 +636,7 @@ class TogaAppHelper:
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "org.beeware.app",
+        package_name: Optional[str] = None,
         app_title: str = "Toga App",
         release: bool = False,
         channel: Optional[str] = None,
@@ -592,7 +656,7 @@ class TogaAppHelper:
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = TogaAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = TogaAppHelper.generate_manifest_xml(package_name or "org.beeware.app", app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -663,7 +727,7 @@ class RenPyAppHelper:
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "org.renpy.game",
+        package_name: Optional[str] = None,
         app_title: str = "Visual Novel",
         release: bool = False,
         channel: Optional[str] = None,
@@ -683,7 +747,7 @@ class RenPyAppHelper:
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = RenPyAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = RenPyAppHelper.generate_manifest_xml(package_name or "org.renpy.game", app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -771,7 +835,7 @@ class WebViewAppHelper:
     def pack_app(
         source_dir: Union[str, Path],
         output_apk: Union[str, Path],
-        package_name: str = "com.webview.app",
+        package_name: Optional[str] = None,
         app_title: str = "WebView App",
         release: bool = False,
         channel: Optional[str] = None,
@@ -791,7 +855,7 @@ class WebViewAppHelper:
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = WebViewAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = WebViewAppHelper.generate_manifest_xml(package_name or "com.webview.app", app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
@@ -893,7 +957,7 @@ class PySideAppHelper:
         if manifest_path.exists():
             builder.add_file(manifest_path, "AndroidManifest.xml")
         else:
-            manifest_str = PySideAppHelper.generate_manifest_xml(package_name, app_title)
+            manifest_str = PySideAppHelper.generate_manifest_xml(package_name or "org.qtproject.example", app_title)
             if release:
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))

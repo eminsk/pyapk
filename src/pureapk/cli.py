@@ -272,14 +272,14 @@ def cmd_init_pygame(args: argparse.Namespace) -> int:
 
 def cmd_pack_kivy(args: argparse.Namespace) -> int:
     from pureapk.frameworks import KivyAppHelper
-    KivyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    KivyAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged Kivy APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
 
 def cmd_pack_pygame(args: argparse.Namespace) -> int:
     from pureapk.frameworks import PygameAppHelper
-    PygameAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    PygameAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged Pygame APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
@@ -293,7 +293,7 @@ def cmd_init_flet(args: argparse.Namespace) -> int:
 
 def cmd_pack_flet(args: argparse.Namespace) -> int:
     from pureapk.frameworks import FletAppHelper
-    FletAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    FletAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged Flet APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
@@ -307,7 +307,7 @@ def cmd_init_toga(args: argparse.Namespace) -> int:
 
 def cmd_pack_toga(args: argparse.Namespace) -> int:
     from pureapk.frameworks import TogaAppHelper
-    TogaAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    TogaAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged BeeWare Toga APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
@@ -321,7 +321,7 @@ def cmd_init_renpy(args: argparse.Namespace) -> int:
 
 def cmd_pack_renpy(args: argparse.Namespace) -> int:
     from pureapk.frameworks import RenPyAppHelper
-    RenPyAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    RenPyAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged Ren'Py APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
@@ -335,7 +335,7 @@ def cmd_init_webview(args: argparse.Namespace) -> int:
 
 def cmd_pack_webview(args: argparse.Namespace) -> int:
     from pureapk.frameworks import WebViewAppHelper
-    WebViewAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    WebViewAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged WebView APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
 
@@ -350,7 +350,7 @@ def cmd_init_pyside(args: argparse.Namespace) -> int:
 def cmd_pack_pyside(args: argparse.Namespace) -> int:
     from pureapk.frameworks import PySideAppHelper
     rel_mode = "release" if getattr(args, "release", False) else "debug"
-    PySideAppHelper.pack_app(args.source_dir, args.output, app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
+    PySideAppHelper.pack_app(args.source_dir, args.output, package_name=getattr(args, "package", None), app_title=args.title, release=getattr(args, "release", False), channel=getattr(args, "channel", None))
     print(f"Successfully packaged PySide/Qt APK ({rel_mode}): {args.output}")
     return 0
 
@@ -525,6 +525,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_kivy = subparsers.add_parser("pack-kivy", help="Pack a Kivy project directory into an APK")
     p_pack_kivy.add_argument("source_dir", help="Kivy project folder")
     p_pack_kivy.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_kivy.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_kivy.add_argument("--title", default="Kivy App", help="App title")
     p_pack_kivy.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_kivy.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -533,6 +534,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_pygame = subparsers.add_parser("pack-pygame", help="Pack a Pygame project directory into an APK")
     p_pack_pygame.add_argument("source_dir", help="Pygame project folder")
     p_pack_pygame.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_pygame.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_pygame.add_argument("--title", default="Pygame App", help="App title")
     p_pack_pygame.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_pygame.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -546,6 +548,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_flet = subparsers.add_parser("pack-flet", help="Pack a Flet project directory into an APK")
     p_pack_flet.add_argument("source_dir", help="Flet project folder")
     p_pack_flet.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_flet.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_flet.add_argument("--title", default="Flet App", help="App title")
     p_pack_flet.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_flet.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -559,6 +562,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_toga = subparsers.add_parser("pack-toga", help="Pack a BeeWare Toga project directory into an APK")
     p_pack_toga.add_argument("source_dir", help="BeeWare Toga project folder")
     p_pack_toga.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_toga.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_toga.add_argument("--title", default="Toga App", help="App title")
     p_pack_toga.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_toga.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -572,6 +576,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_renpy = subparsers.add_parser("pack-renpy", help="Pack a Ren'Py visual novel project into an APK")
     p_pack_renpy.add_argument("source_dir", help="Ren'Py project folder")
     p_pack_renpy.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_renpy.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_renpy.add_argument("--title", default="Visual Novel", help="App title")
     p_pack_renpy.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_renpy.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -585,6 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_web = subparsers.add_parser("pack-webview", help="Pack a WebView project directory into an APK")
     p_pack_web.add_argument("source_dir", help="WebView project folder")
     p_pack_web.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_web.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_web.add_argument("--title", default="WebView App", help="App title")
     p_pack_web.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_web.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")
@@ -598,6 +604,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_pyside = subparsers.add_parser("pack-pyside", aliases=["pack-pyqt"], help="Pack a PySide6 / PyQt6 Qt project into an APK")
     p_pack_pyside.add_argument("source_dir", help="PySide / PyQt project folder")
     p_pack_pyside.add_argument("-o", "--output", required=True, help="Output APK filename")
+    p_pack_pyside.add_argument("-p", "--package", help="Android package name (e.g. com.example.app)")
     p_pack_pyside.add_argument("--title", default="PySide App", help="App title")
     p_pack_pyside.add_argument("--release", action="store_true", help="Build release-ready APK (strip debuggable flags)")
     p_pack_pyside.add_argument("--channel", help="Distribution store channel tag (e.g. huawei, xiaomi, oppo, vivo, tencent, rustore)")

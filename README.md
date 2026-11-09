@@ -12,6 +12,7 @@
 [![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
+[![Developer Portal](https://img.shields.io/badge/Developer%20Portal-eminsk.github.io-00F0FF.svg?style=flat)](https://eminsk.github.io/)
 [![Python Versions](https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white)](https://pypi.org/project/pureapk/)
 [![Free-Threaded No-GIL](https://img.shields.io/badge/No--GIL-3.13t%20--%203.16t-brightgreen?style=flat)](https://peps.python.org/pep-0703/)
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)

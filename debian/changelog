@@ -1,3 +1,12 @@
+python-pureapk (1.0.1-1) unstable; urgency=medium
+
+  * Release version 1.0.1: Documentation enhancements, PyPI rendering fixes.
+  * Added dedicated documentation for modifying, modding, and re-signing existing APKs without Java.
+  * Fixed Russian documentation link on PyPI project page.
+  * Added cache-busting to badges for instant CDN updates.
+
+ -- eminsk <M_N_N@tut.by>  Sun, 08 Nov 2026 19:05:00 +0000
+
 python-pureapk (1.0.0-1) unstable; urgency=medium
 
   * Release version 1.0.0: First stable major production release.

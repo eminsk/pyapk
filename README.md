@@ -5,10 +5,10 @@
 ### Pure Python Android APK Engine, Multi-Store Packager & Toolchain
 **Zero external dependencies, zero-copy memoryview parsing, 100% tests passing on CPython 3.8–3.16, Free-Threaded (No-GIL), and PyPy.**
 
-[ 🇬🇧 English ] | [ 🇷🇺 Документация на русском ](README_RU.md)
+[ 🇬🇧 English Documentation ](https://github.com/eminsk/pyapk#readme) | [ 🇷🇺 Документация на русском ](https://github.com/eminsk/pyapk/blob/main/README_RU.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
-[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
+[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1)](https://pypi.org/project/pureapk/)
 [![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
@@ -51,6 +51,8 @@
 ## 🚀 Key Advantages
 
 - 🛡️ **Zero External Dependencies**: Built entirely upon standard Python primitives (`struct`, `zipfile`, `hashlib`, `xml.etree`). No JVM, no Android SDK/NDK, no bloated Gradle wrappers required on host.
+- 🚫 **Zero Java & Zero Android Studio**: Completely eliminates 15–20 GB of SDK, NDK, OpenJDK, and Gradle. All APK operations (binary AXML, DEX, 16KB alignment, v1/v2 signing) execute in 100% pure Python in seconds.
+- 🔧 **Repackaging, Modding & Re-signing Existing APKs**: Extract any existing APK (`pureapk extract`), patch Python code/assets/manifest, inject wheels, automatically strip stale `META-INF/`, 16KB align for Android 15, and re-sign with a clean signature (`pureapk pack --sign`).
 - ⚡ **Zero-Copy & Low Memory**: Uses `__slots__` exclusively across all core classes (no dynamic `__dict__` overhead) and `memoryview` slicing.
 - 🎯 **Branch-Free Functional Architecture**: Implements clean functional programming patterns, dictionary dispatch tables, and iterator streams for predictable, hot-path execution.
 - 🧵 **Free-Threaded / No-GIL Safe**: Designed for lock-free parallel parsing and thread-safe lazy property evaluation.
@@ -83,7 +85,7 @@ uv add pureapk
 
 ### Install Pre-Built Universal Wheel Directly from GitHub
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v1.0.0/pureapk-1.0.0-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v1.0.1/pureapk-1.0.1-py3-none-any.whl
 ```
 
 ### Ubuntu / Debian (Official APT PPA)
@@ -95,7 +97,7 @@ curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash
 sudo apt install python3-pureapk
 
 # Or install standalone .deb package directly
-sudo dpkg -i python3-pureapk_1.0.0-1_all.deb
+sudo dpkg -i python3-pureapk_1.0.1-1_all.deb
 ```
 
 ### Conda / Mamba / Pixi (Anaconda.org)
@@ -203,6 +205,35 @@ from pureapk.ci import GitHubCythonWorkflowHelper
 # Scaffolds ready-to-run .github/workflows/build-native.yml and Cython template
 res = GitHubCythonWorkflowHelper.scaffold_project("./my_app", cython=True)
 print("Created CI workflow:", res["workflow_path"])
+```
+
+### 8. Modding, Patching & Re-signing Existing APKs
+
+`pureapk` allows taking an existing APK, modifying its code or dependencies, and releasing a new signed version without Java or Android Studio:
+
+```python
+from pureapk import APK
+from pureapk.builder import pack
+from pureapk.wheels import AndroidWheelHelper
+
+# 1. Extract existing APK into a workspace
+with APK("my_app_v1.apk") as apk:
+    apk.extract("./patched_app")
+
+# 2. Add native libraries (.so) from an Android wheel
+AndroidWheelHelper.unpack_wheel("cool_lib-android_aarch64.whl", target_dir="./patched_app")
+
+# 3. Pack and sign new version v2:
+#    - strips stale META-INF/ (removes old signatures)
+#    - enforces Android 15 16KB page alignment on .so libraries
+#    - generates fresh v1 (JAR) and v2 (APK Signing Block) signatures
+pack(
+    source_dir="./patched_app",
+    output_apk="my_app_v2.apk",
+    sign=True,
+    auto_axml=True,
+    so_alignment=16384,
+)
 ```
 
 ---
@@ -458,6 +489,12 @@ pureapk unpack-wheel package-android_24_arm64_v8a.whl my_app/
 
 # Generate Cloud CI for Cython & Android NDK (16KB aligned builds in GitHub Actions)
 pureapk init-ci my_app/ --cython
+
+# Full cycle of patching and re-signing an existing APK:
+pureapk extract app_v1.apk ./workspace/
+pureapk install-deps ./workspace/ requests
+pureapk unpack-wheel numpy-android_aarch64.whl ./workspace/
+pureapk pack ./workspace/ -o app_v2.apk --sign
 
 # Multi-Store Packaging (Google Play AAB, Apple IPA, Microsoft Store MSIX)
 pureapk pack-aab project_dir/ -o app.aab

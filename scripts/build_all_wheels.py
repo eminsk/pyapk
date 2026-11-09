@@ -19,7 +19,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyapk"
-version = "1.0.0"
+version = "1.0.1"
 description = "High-performance pure Python APK inspection and packaging toolkit."
 readme = "README.md"
 license = { text = "MIT" }

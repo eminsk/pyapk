@@ -5,10 +5,10 @@
 ### Pure Python движок для Android APK, мульти-стор упаковщик и инструментарий
 **Zero dependencies (0 внешних зависимостей), парсинг через zero-copy memoryview, 100% пройденных тестов на CPython 3.8–3.16, Free-Threaded (No-GIL) и PyPy.**
 
-[ 🇬🇧 English Documentation ](README.md) | [ 🇷🇺 Документация на русском ]
+[ 🇬🇧 English Documentation ](https://github.com/eminsk/pyapk#readme) | [ 🇷🇺 Документация на русском ](https://github.com/eminsk/pyapk/blob/main/README_RU.md)
 
 [![Версия релиза](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
-[![Версия PyPI](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da)](https://pypi.org/project/pureapk/)
+[![Версия PyPI](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1)](https://pypi.org/project/pureapk/)
 [![Версия Conda](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![Скачивания PyPI](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
@@ -51,6 +51,8 @@
 ## 🚀 Ключевые преимущества
 
 - 🛡️ **Ноль внешних зависимостей (Zero Dependencies)**: Построен исключительно на примитивах стандартной библиотеки (`struct`, `zipfile`, `hashlib`, `xml.etree`). Больше не нужны гигабайты Android SDK, NDK, Java Virtual Machine и Gradle на хост-машине.
+- 🚫 **Без Java и Android Studio**: Никакой установки 15–20 ГБ SDK, NDK, OpenJDK и Gradle. Все операции с APK (бинарный AXML, DEX, 16KB-выравнивание и подпись) выполняются на 100% чистом Python за секунды.
+- 🔧 **Доработка и моддинг готовых APK**: Извлечение любого существующего APK (`pureapk extract`), замена кода/ресурсов/манифеста, добавление wheels, автоматическая очистка старого `META-INF/`, перевыравнивание под Android 15 и переподпись (`pureapk pack --sign`).
 - ⚡ **Zero-Copy и минимальная память**: Во всех ключевых классах строго используется `__slots__` (без оверхеда динамического словаря `__dict__`) и срезы `memoryview`.
 - 🎯 **Функциональная архитектура без циклов и ветвлений**: Чистые паттерны функционального программирования, таблицы диспетчеризации словарей и потоки итераторов для предсказуемого и быстрого исполнения в горячих путях.
 - 🧵 **Безопасность в Free-Threaded (No-GIL)**: Поддержка параллельного парсинга без блокировок и потокобезопасная ленивая инициализация свойств.
@@ -83,7 +85,7 @@ uv add pureapk
 
 ### Установка готового универсального колеса прямо из GitHub Releases
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v1.0.0/pureapk-1.0.0-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v1.0.1/pureapk-1.0.1-py3-none-any.whl
 ```
 
 ### Установка в Ubuntu / Debian через официальный репозиторий APT (PPA)
@@ -95,7 +97,7 @@ curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash
 sudo apt install python3-pureapk
 
 # Либо установка готового пакета .deb напрямую
-sudo dpkg -i python3-pureapk_1.0.0-1_all.deb
+sudo dpkg -i python3-pureapk_1.0.1-1_all.deb
 ```
 
 ### Установка через Conda / Mamba / Pixi (Anaconda.org)
@@ -203,6 +205,35 @@ from pureapk.ci import GitHubCythonWorkflowHelper
 # Генерация готового .github/workflows/build-native.yml и шаблонов Cython
 res = GitHubCythonWorkflowHelper.scaffold_project("./my_app", cython=True)
 print("Создан CI воркфлоу:", res["workflow_path"])
+```
+
+### 8. Доработка, модификация и переподпись готовых APK (Modding & Patching)
+
+`pureapk` позволяет разобрать готовый APK, внести изменения и собрать новую подписанную версию без Java и Android Studio:
+
+```python
+from pureapk import APK
+from pureapk.builder import pack
+from pureapk.wheels import AndroidWheelHelper
+
+# 1. Распаковываем существующий APK в рабочую папку
+with APK("my_app_v1.apk") as apk:
+    apk.extract("./patched_app")
+
+# 2. Добавляем новые скомпилированные библиотеки (.so) из Android Wheel
+AndroidWheelHelper.unpack_wheel("cool_lib-android_aarch64.whl", target_dir="./patched_app")
+
+# 3. Собираем новую готовую версию v2:
+#    - автоматически очищает старый META-INF/ (удаляет старую подпись)
+#    - выравнивает .so библиотеки по границе 16 КБ (Android 15)
+#    - генерирует свежие v1 и v2 цифровые подписи
+pack(
+    source_dir="./patched_app",
+    output_apk="my_app_v2.apk",
+    sign=True,
+    auto_axml=True,
+    so_alignment=16384,
+)
 ```
 
 ---
@@ -458,6 +489,12 @@ pureapk unpack-wheel package-android_24_arm64_v8a.whl my_app/
 
 # Генерация облачного CI для Cython и Android NDK (сборка без засорения системы)
 pureapk init-ci my_app/ --cython
+
+# Полный цикл доработки и переподписи готового APK:
+pureapk extract app_v1.apk ./workspace/
+pureapk install-deps ./workspace/ requests
+pureapk unpack-wheel numpy-android_aarch64.whl ./workspace/
+pureapk pack ./workspace/ -o app_v2.apk --sign
 
 # Подготовка к магазинам приложений (Google Play AAB, Apple IPA, Windows MSIX)
 pureapk pack-aab project_dir/ -o app.aab

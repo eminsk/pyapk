@@ -422,7 +422,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="pureapk",
         description="High-performance pure Python APK inspection, alignment, and packaging toolkit.",
     )
-    parser.add_argument("-V", "--version", action="version", version="pureapk 1.0.0")
+    parser.add_argument("-V", "--version", action="version", version="pureapk 1.0.1")
 
     subparsers = parser.add_subparsers(dest="command", help="Sub-commands")
 

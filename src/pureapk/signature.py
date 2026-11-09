@@ -343,8 +343,11 @@ class APKSigner:
             b"Signature-Version: 1.0",
             b"Created-By: 1.0 (Android)",
             f"SHA-256-Digest-Manifest: {sf_manifest_digest}".encode("utf-8"),
-            b"",
         ]
+        if v2:
+            sf_lines.append(b"X-Android-APK-Signed: 2")
+        sf_lines.append(b"")
+
         for name, d in sorted(entry_digests.items()):
             sf_lines.append(f"Name: {name}".encode("utf-8"))
             sf_lines.append(f"SHA-256-Digest: {d}".encode("utf-8"))
@@ -402,23 +405,27 @@ class APKSigner:
         for part in (part1, part2, part3):
             for i in range(0, len(part), chunk_size):
                 chunk = part[i : i + chunk_size]
-                h = hashlib.sha256(b"\x5a" + struct.pack("<I", len(chunk)) + chunk).digest()
+                # Chunk digest prefix is 0xa5
+                h = hashlib.sha256(b"\xa5" + struct.pack("<I", len(chunk)) + chunk).digest()
                 chunks.append(h)
 
-        content_digest = hashlib.sha256(b"\xa5" + struct.pack("<I", len(chunks)) + b"".join(chunks)).digest()
+        # Top content digest prefix is 0x5a
+        content_digest = hashlib.sha256(b"\x5a" + struct.pack("<I", len(chunks)) + b"".join(chunks)).digest()
 
         # v2 SignedData structure: digests + certs + additional attributes
-        digests_seq = _len_prefixed(_len_prefixed(struct.pack("<I", 0x0103) + _len_prefixed(content_digest)))
+        single_digest = struct.pack("<I", 0x0103) + _len_prefixed(content_digest)
+        digests_seq = _len_prefixed(_len_prefixed(single_digest))
         certs_seq = _len_prefixed(_len_prefixed(_DEBUG_CERT_DER))
         attrs_seq = _len_prefixed(b"")
-        v2_signed_data = _len_prefixed(digests_seq + certs_seq + attrs_seq)
+        signed_data = digests_seq + certs_seq + attrs_seq
 
-        # v2 Signature: RSA PKCS#1 v1.5 over v2_signed_data
-        v2_sig = _rsa_sign_sha256(v2_signed_data, _DEBUG_RSA_N, _DEBUG_RSA_D)
-        signatures_seq = _len_prefixed(_len_prefixed(struct.pack("<I", 0x0103) + _len_prefixed(v2_sig)))
+        # v2 Signature: RSA PKCS#1 v1.5 over RAW signed_data
+        v2_sig = _rsa_sign_sha256(signed_data, _DEBUG_RSA_N, _DEBUG_RSA_D)
+        single_sig = struct.pack("<I", 0x0103) + _len_prefixed(v2_sig)
+        signatures_seq = _len_prefixed(_len_prefixed(single_sig))
         public_key_seq = _len_prefixed(_DEBUG_PUBKEY_DER)
 
-        signer_data = _len_prefixed(v2_signed_data + signatures_seq + public_key_seq)
+        signer_data = _len_prefixed(_len_prefixed(signed_data) + signatures_seq + public_key_seq)
         signers_seq = _len_prefixed(signer_data)
 
         pair_len = 4 + len(signers_seq)

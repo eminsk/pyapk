@@ -232,7 +232,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
                         data = gzip.compress(data)
 
-                    builder.add_bytes(arc_name, data, compress=True)
+                    builder.add_bytes(arc_name, data, compress=False)
 
                 else:
 
@@ -348,7 +348,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
         if has_files and tar_bytes:
 
-            builder.add_bytes("assets/private.tar", tar_bytes, compress=True)
+            builder.add_bytes("assets/private.tar", tar_bytes, compress=False)
             builder.add_bytes("assets/private.mp3", tar_bytes, compress=False)
 
 

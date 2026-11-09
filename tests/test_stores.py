@@ -71,6 +71,19 @@ def test_apple_ipa_packaging(tmp_path: Path) -> None:
         assert "Payload/CoolApp.app/Info.plist" in names
         assert "Payload/CoolApp.app/main.py" in names
 
+    # Automated Apple IPA validation without macOS
+    report = AppleAppHelper.verify_ipa(ipa_path)
+    assert report["valid"] is True
+    assert report["app_name"] == "CoolApp"
+    assert report["bundle_id"] == "com.cool.app"
+    assert report["has_pkginfo"] is True
+    assert report["sideload_ready"] is True
+
+    # Test CLI IPA verification
+    assert cli_main(["verify", str(ipa_path), "--json"]) == 0
+    assert cli_main(["verify-ipa", str(ipa_path)]) == 0
+    assert cli_main([str(ipa_path)]) == 0
+
 
 def test_windows_msix_packaging(tmp_path: Path) -> None:
     win_dir = tmp_path / "win_project"

@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>pureapk — Pure Python Android APK Engine & Multi-Store Packager</title>
+  <meta name="description" content="High-performance pure Python APK inspection, multi-store packager, and framework toolchain with zero dependencies. Zero Java, Zero Android Studio, Android 15 16KB page aligned.">
+  <meta name="keywords" content="pureapk, pyapk, python apk, android packaging, zero dependencies, no-gil, android 15, 16kb alignment, zipalign, kivy, pygame, flet, toga, aab, ipa, msix">
+  
+  <!-- Open Graph / Meta -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="pureapk • Pure Python Android APK Engine">
+  <meta property="og:description" content="Zero dependencies, Zero Java, Zero Android Studio. Packaging, inspection, 16KB alignment (Android 15), and multi-store distribution.">
+  <meta property="og:url" content="https://eminsk.github.io/pyapk/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #38bdf8;
+      --primary-hover: #0ea5e9;
+      --accent: #818cf8;
+      --emerald: #34d399;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --code-bg: #030712;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(56, 189, 248, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 85% 30%, rgba(129, 140, 248, 0.10) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(52, 211, 153, 0.08) 0%, transparent 50%);
+      background-attachment: fixed;
+    }
+
+    /* Container */
+    .container { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Header & Nav */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(16px);
+      background: rgba(11, 15, 25, 0.85);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0.85rem 0;
+    }
+    .nav-wrapper { display: flex; justify-content: space-between; align-items: center; }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #fff;
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .logo span {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .nav-links { display: flex; gap: 1.75rem; align-items: center; list-style: none; }
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--primary); }
+    .nav-actions { display: flex; gap: 0.75rem; align-items: center; }
+    
+    .btn-lang {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-lang:hover { background: rgba(255, 255, 255, 0.12); }
+
+    .btn-github {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: #1f2937;
+      color: #fff;
+      padding: 0.42rem 0.95rem;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.88rem;
+      font-weight: 600;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: all 0.2s;
+    }
+    .btn-github:hover { background: #374151; border-color: var(--primary); }
+
+    /* Hero Section */
+    .hero {
+      padding: 5rem 0 3.5rem;
+      text-align: center;
+      position: relative;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--primary);
+      padding: 0.35rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.3rem, 5.5vw, 4.2rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      margin-bottom: 1.25rem;
+    }
+    .hero h1 .gradient-text {
+      background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: clamp(1.05rem, 1.8vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 820px;
+      margin: 0 auto 2.25rem;
+      font-weight: 400;
+    }
+
+    /* Install Box */
+    .install-box {
+      display: inline-flex;
+      align-items: center;
+      background: var(--code-bg);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(56, 189, 248, 0.1);
+      border-radius: 12px;
+      padding: 0.4rem 0.6rem 0.4rem 1.2rem;
+      max-width: 520px;
+      width: 100%;
+      margin-bottom: 1.75rem;
+    }
+    .install-box code {
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      color: #38bdf8;
+      flex-grow: 1;
+      text-align: left;
+    }
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: none;
+      color: #fff;
+      padding: 0.5rem 0.9rem;
+      border-radius: 8px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: rgba(56, 189, 248, 0.25); color: #38bdf8; }
+
+    /* Badges Bar */
+    .badges-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.55rem;
+      margin-bottom: 3.5rem;
+    }
+    .badges-bar img { height: 22px; border-radius: 4px; }
+
+    /* Highlights Grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 5rem;
+    }
+    .feature-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.85rem;
+      transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(56, 189, 248, 0.4);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    }
+    .feature-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      display: inline-block;
+    }
+    .feature-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 0.6rem;
+      color: #fff;
+    }
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    /* Section Headers */
+    .section-header {
+      text-align: center;
+      margin-bottom: 2.75rem;
+    }
+    .section-header h2 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.6rem;
+    }
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    /* Interactive Frameworks & Code Showcase */
+    .interactive-showcase {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      overflow: hidden;
+      margin-bottom: 5rem;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+    }
+    .tab-bar {
+      display: flex;
+      overflow-x: auto;
+      background: rgba(3, 7, 18, 0.85);
+      border-bottom: 1px solid var(--card-border);
+      padding: 0.5rem 0.75rem;
+      gap: 0.5rem;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 0.55rem 1.1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.05); }
+    .tab-btn.active {
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .tab-content { padding: 2rem; display: none; }
+    .tab-content.active { display: block; }
+    
+    .code-window {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.6rem 1rem;
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: #e5e7eb;
+    }
+
+    /* Workflow Stepper */
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 5rem;
+    }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      position: relative;
+    }
+    .step-number {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.15);
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      margin-bottom: 1rem;
+    }
+    .step-card h4 { font-size: 1.15rem; margin-bottom: 0.5rem; color: #fff; }
+    .step-card p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.8rem; }
+    .step-card code {
+      display: block;
+      background: var(--code-bg);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--emerald);
+      border: 1px solid var(--card-border);
+    }
+
+    /* CLI Reference Table with Search */
+    .cli-section { margin-bottom: 5rem; }
+    .search-box {
+      width: 100%;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      padding: 0.85rem 1.2rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: var(--font-sans);
+      margin-bottom: 1.5rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box:focus { border-color: var(--primary); }
+    .cli-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .cli-table th, .cli-table td {
+      padding: 1rem 1.2rem;
+      text-align: left;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .cli-table th {
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+    .cli-table code {
+      font-family: var(--font-mono);
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.08);
+      padding: 0.2rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 3rem 0 2rem;
+      background: rgba(3, 7, 18, 0.95);
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .footer-col h5 { color: #fff; font-size: 1rem; margin-bottom: 0.9rem; }
+    .footer-col ul { list-style: none; }
+    .footer-col ul li { margin-bottom: 0.5rem; }
+    .footer-col a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+    .footer-col a:hover { color: var(--primary); }
+    .footer-bottom {
+      text-align: center;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.85rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .hero { padding: 3.5rem 0 2rem; }
+      .features-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="container nav-wrapper">
+      <a href="#" class="logo">
+        ⚡ <span>pureapk</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features" data-i18n="nav-features">Преимущества</a></li>
+        <li><a href="#frameworks" data-i18n="nav-frameworks">Фреймворки</a></li>
+        <li><a href="#modding" data-i18n="nav-modding">Моддинг APK</a></li>
+        <li><a href="#cli" data-i18n="nav-cli">CLI команды</a></li>
+        <li><a href="#install" data-i18n="nav-install">Установка</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button id="langToggle" class="btn-lang" onclick="toggleLanguage()">🇬🇧 EN</button>
+        <a href="https://github.com/eminsk/pyapk" target="_blank" class="btn-github">
+          <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge" data-i18n="hero-badge">
+        🚀 Версия 1.0.1 • Production / Stable • 0 Внешних Зависимостей
+      </div>
+      <h1 data-i18n="hero-title">
+        Pure Python Движок для <br>
+        <span class="gradient-text">Android APK & Мульти-Стор Упаковщик</span>
+      </h1>
+      <p data-i18n="hero-desc">
+        Забудьте про гигабайты Android SDK, NDK, Java и Gradle. Скоростной парсинг через zero-copy memoryview, нативное 16-килобайтное выравнивание под Android 15, распаковка Android Wheels и экспорт в Google Play, Apple App Store и Windows Store.
+      </p>
+
+      <div class="install-box">
+        <code>pip install pureapk</code>
+        <button class="copy-btn" onclick="copyInstall('pip install pureapk')">Copy</button>
+      </div>
+
+      <!-- Badges -->
+      <div class="badges-bar">
+        <a href="https://pypi.org/project/pureapk/" target="_blank"><img src="https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1" alt="PyPI"></a>
+        <a href="https://anaconda.org/m_n_nik/pureapk" target="_blank"><img src="https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833" alt="Conda"></a>
+        <a href="https://eminsk.github.io/ppa/" target="_blank"><img src="https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat" alt="PPA"></a>
+        <img src="https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white" alt="Python">
+        <img src="https://img.shields.io/badge/No--GIL-3.13t%20--%203.16t-brightgreen?style=flat" alt="No-GIL">
+        <img src="https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy" alt="PyPy">
+        <img src="https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat" alt="Zero Dependencies">
+        <img src="https://img.shields.io/badge/tests-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white" alt="Tests">
+        <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat" alt="MIT License">
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Highlights -->
+  <section id="features" class="container">
+    <div class="section-header">
+      <h2 data-i18n="feat-header">Почему pureapk уникален?</h2>
+      <p data-i18n="feat-sub">Создан с бескомпромиссным вниманием к автономности, скорости и отсутствию внешнего мусора.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🚫</div>
+        <h3 data-i18n="feat-1-title">Без Java и Android Studio</h3>
+        <p data-i18n="feat-1-desc">Никаких 15–20 ГБ SDK, NDK, OpenJDK и Gradle. Все операции с APK (бинарный AXML, DEX, 16KB-выравнивание, подпись) работают на 100% чистом Python за секунды.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3 data-i18n="feat-2-title">Android 15 Ready (16KB)</h3>
+        <p data-i18n="feat-2-desc">Нативная реализация стандарта Google 16KB Page Alignment для бинарников <code>.so</code> с официальным тегом <code>0xd935</code>. Больше не нужен системный <code>zipalign.exe</code>.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔧</div>
+        <h3 data-i18n="feat-3-title">Моддинг и Доработка APK</h3>
+        <p data-i18n="feat-3-desc">Извлечение любого существующего APK, замена кода или манифеста, добавление wheels, авто-очистка старого META-INF/ и переподпись v1/v2 в одну команду.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🏬</div>
+        <h3 data-i18n="feat-4-title">Мульти-Стор Вселенная</h3>
+        <p data-i18n="feat-4-desc">Прямая генерация пакетов для Google Play (.aab), Apple App Store (.ipa с Info.plist), Microsoft Store (.msix с 64KB AppxBlockMap) и китайских сторов (--channel).</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🧩</div>
+        <h3 data-i18n="feat-5-title">Android Wheels & Cython CI</h3>
+        <p data-i18n="feat-5-desc">Инспекция и распаковка предсобранных .whl пакетов с раскладкой .so в lib/&lt;abi&gt;/. Авто-генератор GitHub Actions CI для сборки Cython NDK в облаке.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 data-i18n="feat-6-title">Zero-Copy & No-GIL</h3>
+        <p data-i18n="feat-6-desc">Использование <code>__slots__</code> во всех классах, парсинг срезами <code>memoryview</code> и 100% подтверждённая потокобезопасность на Python 3.13t–3.16t (Free-Threaded No-GIL) и PyPy.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Frameworks & Code Showcase -->
+  <section id="frameworks" class="container">
+    <div class="section-header">
+      <h2 data-i18n="fw-header">Поддержка Всех Популярных GUI Фреймворков</h2>
+      <p data-i18n="fw-sub">Шаблонизация, синтез манифестов и мгновенная упаковка в APK в один клик.</p>
+    </div>
+
+    <div class="interactive-showcase">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('kivy')">Kivy</button>
+        <button class="tab-btn" onclick="switchTab('pygame')">Pygame-CE</button>
+        <button class="tab-btn" onclick="switchTab('flet')">Flet (Flutter)</button>
+        <button class="tab-btn" onclick="switchTab('toga')">BeeWare (Toga)</button>
+        <button class="tab-btn" onclick="switchTab('webview')">HTML5 WebView</button>
+        <button class="tab-btn" onclick="switchTab('pyside')">PySide6 / PyQt</button>
+        <button class="tab-btn" onclick="switchTab('stores')">Multi-Store (AAB/IPA/MSIX)</button>
+      </div>
+
+      <!-- Kivy Tab -->
+      <div id="tab-kivy" class="tab-content active">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Terminal & Python API</span>
+            <button class="copy-btn" onclick="copyCode('code-kivy')">Copy</button>
+          </div>
+          <pre id="code-kivy"><code># 1. Инициализация каркаса проекта
+pureapk init-kivy my_kivy_app --title "My Kivy App"
+
+# 2. Установка чистых Python зависимостей прямо в проект
+pureapk install-deps my_kivy_app/ requests urllib3
+
+# 3. Мгновенная упаковка в релизный APK с 16KB выравниванием и цифровой подписью
+pureapk pack-kivy my_kivy_app/ -o app.apk --release
+
+# Либо мульти-канальная сборка под китайские маркетплейсы
+pureapk pack-kivy my_kivy_app/ -o app_huawei.apk --channel huawei --release</code></pre>
+        </div>
+      </div>
+
+      <!-- Pygame Tab -->
+      <div id="tab-pygame" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Pygame-CE Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-pygame')">Copy</button>
+          </div>
+          <pre id="code-pygame"><code># 1. Создание каркаса аркады на Pygame
+pureapk init-pygame space_shooter --title "Space Shooter 2D"
+
+# 2. Упаковка в Android APK (настройка ориентации landscape, OpenGL ES 2.0)
+pureapk pack-pygame space_shooter/ -o shooter.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- Flet Tab -->
+      <div id="tab-flet" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Flet / Flutter Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-flet')">Copy</button>
+          </div>
+          <pre id="code-flet"><code># Создание и упаковка современного Material 3 приложения
+pureapk init-flet my_flet_app --title "Flet Dashboard"
+pureapk pack-flet my_flet_app/ -o flet_app.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- Toga Tab -->
+      <div id="tab-toga" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>BeeWare Toga Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-toga')">Copy</button>
+          </div>
+          <pre id="code-toga"><code># Нативные системные виджеты ОС без лишних абстракций
+pureapk init-toga native_app --title "BeeWare Native"
+pureapk pack-toga native_app/ -o toga.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- WebView Tab -->
+      <div id="tab-webview" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>HTML5 + Python Backend</span>
+            <button class="copy-btn" onclick="copyCode('code-web')">Copy</button>
+          </div>
+          <pre id="code-web"><code># Запуск веб-приложений через встроенный WebView Android
+pureapk init-webview web_app --title "HTML5 Hybrid"
+pureapk pack-webview web_app/ -o webview.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- PySide Tab -->
+      <div id="tab-pyside" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>PySide6 / PyQt Terminal</span>
+            <button class="copy-btn" onclick="copyCode('code-pyside')">Copy</button>
+          </div>
+          <pre id="code-pyside"><code># Qt for Android интеграция
+pureapk init-pyside qt_project --title "PySide6 App"
+pureapk pack-pyside qt_project/ -o qt_app.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- Stores Tab -->
+      <div id="tab-stores" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Multi-Store Distribution API</span>
+            <button class="copy-btn" onclick="copyCode('code-stores')">Copy</button>
+          </div>
+          <pre id="code-stores"><code># Google Play: Сборка Android App Bundle (.aab)
+pureapk pack-aab my_project/ -o release.aab
+
+# Apple App Store: Генерация Info.plist и упаковка .ipa
+pureapk init-ios ios_app --title "MyIOSApp" --bundle-id "com.company.app"
+pureapk pack-ipa ios_app/ -o release.ipa --title "MyIOSApp"
+
+# Microsoft Store: Генерация AppxManifest и .msix с 64KB BlockMap хешами
+pureapk init-windows win_app --title "MyWinApp" --package "MyCompany.App"
+pureapk pack-msix win_app/ -o release.msix</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APK Modding & Patching Workflow -->
+  <section id="modding" class="container">
+    <div class="section-header">
+      <h2 data-i18n="mod-header">Доработка, Моддинг и Переподпись Готовых APK</h2>
+      <p data-i18n="mod-sub">Полный рабочий цикл обновления существующих APK без единой строчки Java или Android SDK.</p>
+    </div>
+
+    <div class="stepper">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <h4 data-i18n="step-1-title">Распаковка APK</h4>
+        <p data-i18n="step-1-desc">Извлеките файлы, ассеты, манифест и код из любого существующего APK-файла.</p>
+        <code>pureapk extract app_v1.apk ./workspace/</code>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <h4 data-i18n="step-2-title">Внесение Доработок</h4>
+        <p data-i18n="step-2-desc">Обновите код, подкиньте нативные Android Wheels (.whl) или чистые библиотеки из PyPI.</p>
+        <code>pureapk unpack-wheel numpy.whl ./workspace/</code>
+      </div>
+
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <h4 data-i18n="step-3-title">Выравнивание & Подпись</h4>
+        <p data-i18n="step-3-desc">Сборка v2: очищает старый META-INF/, выравнивает под Android 15 (16KB) и подписывает v1/v2.</p>
+        <code>pureapk pack ./workspace/ -o app_v2.apk --sign</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLI Reference Search -->
+  <section id="cli" class="container cli-section">
+    <div class="section-header">
+      <h2 data-i18n="cli-header">Справочник Команд CLI</h2>
+      <p data-i18n="cli-sub">Интерактивный поиск по встроенным инструментам pureapk / pyapk.</p>
+    </div>
+
+    <input type="text" id="cliSearch" class="search-box" placeholder="Поиск по командам (например: zipalign, wheel, aab, sign)..." onkeyup="filterCliTable()">
+
+    <table class="cli-table" id="cliTable">
+      <thead>
+        <tr>
+          <th style="width: 25%;">Команда</th>
+          <th style="width: 35%;">Пример использования</th>
+          <th style="width: 40%;">Назначение</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>pureapk info</code></td>
+          <td><code>pureapk info app.apk [--json]</code></td>
+          <td>Быстрая инспекция APK: пакет, SDK, архитектуры, 16KB выравнивание, подписи</td>
+        </tr>
+        <tr>
+          <td><code>pureapk verify</code></td>
+          <td><code>pureapk verify app.apk</code></td>
+          <td>Валидация CRC32, цифровых подписей (v1/v2/v3) и 16KB-соответствия</td>
+        </tr>
+        <tr>
+          <td><code>pureapk zipalign</code></td>
+          <td><code>pureapk zipalign in.apk -o out.apk</code></td>
+          <td>Выравнивание по страницам 16 КБ для Android 15 (тег 0xd935) без zipalign.exe</td>
+        </tr>
+        <tr>
+          <td><code>pureapk unpack-wheel</code></td>
+          <td><code>pureapk unpack-wheel pkg.whl ./app/</code></td>
+          <td>Распаковка Android Wheel: раскладка .so в lib/&lt;abi&gt;/ и кода в проект</td>
+        </tr>
+        <tr>
+          <td><code>pureapk init-ci</code></td>
+          <td><code>pureapk init-ci ./app/ --cython</code></td>
+          <td>Генерация воркфлоу GitHub Actions для сборки Cython NDK в облаке</td>
+        </tr>
+        <tr>
+          <td><code>pureapk install-deps</code></td>
+          <td><code>pureapk install-deps ./app/ requests</code></td>
+          <td>Установка чистых Python зависимостей прямо в директорию приложения</td>
+        </tr>
+        <tr>
+          <td><code>pureapk compile-manifest</code></td>
+          <td><code>pureapk compile-manifest AndroidManifest.xml -o out.axml</code></td>
+          <td>Компиляция текстового XML в бинарный Android Binary XML (AXML)</td>
+        </tr>
+        <tr>
+          <td><code>pureapk extract</code></td>
+          <td><code>pureapk extract app.apk ./out_dir/</code></td>
+          <td>Распаковка полного содержимого APK-файла в указанную папку</td>
+        </tr>
+        <tr>
+          <td><code>pureapk pack</code></td>
+          <td><code>pureapk pack ./src/ -o app.apk --sign</code></td>
+          <td>Сборка APK с 16KB-выравниванием и автоматической цифровой подписью</td>
+        </tr>
+        <tr>
+          <td><code>pureapk sign</code></td>
+          <td><code>pureapk sign app.apk</code></td>
+          <td>Цифровая подпись APK схемами v1 (JAR) и v2 (APK Signing Block)</td>
+        </tr>
+        <tr>
+          <td><code>pureapk pack-aab</code></td>
+          <td><code>pureapk pack-aab ./app/ -o app.aab</code></td>
+          <td>Сборка Google Play Android App Bundle с BundleConfig.pb</td>
+        </tr>
+        <tr>
+          <td><code>pureapk pack-ipa</code></td>
+          <td><code>pureapk pack-ipa ./app/ -o app.ipa</code></td>
+          <td>Упаковка приложения для Apple App Store с PkgInfo и Info.plist</td>
+        </tr>
+        <tr>
+          <td><code>pureapk pack-msix</code></td>
+          <td><code>pureapk pack-msix ./app/ -o app.msix</code></td>
+          <td>Сборка пакета Microsoft Store с вычислением 64KB хэшей AppxBlockMap</td>
+        </tr>
+        <tr>
+          <td><code>pureapk generate-keystore</code></td>
+          <td><code>pureapk generate-keystore -o release.keystore</code></td>
+          <td>Генерация защищённого криптографического релизного ключа для сторов</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- Installation Hub -->
+  <section id="install" class="container" style="margin-bottom: 5rem;">
+    <div class="section-header">
+      <h2 data-i18n="inst-header">Центр Установки</h2>
+      <p data-i18n="inst-sub">Доступно во всех ведущих репозиториях пакетов.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>PyPI (Официальный релиз)</h3>
+        <p style="margin-bottom: 1rem;">Установка стандартного легковесного пакета (~50 КБ, 0 зависимостей):</p>
+        <code style="display:block; background:var(--code-bg); padding:0.6rem; border-radius:6px; color:#38bdf8; font-family:var(--font-mono); font-size:0.85rem;">pip install pureapk</code>
+      </div>
+
+      <div class="feature-card">
+        <h3>Conda / Mamba / Pixi</h3>
+        <p style="margin-bottom: 1rem;">Установка из канала Anaconda.org:</p>
+        <code style="display:block; background:var(--code-bg); padding:0.6rem; border-radius:6px; color:#34d399; font-family:var(--font-mono); font-size:0.85rem;">conda install -c m_n_nik pureapk</code>
+      </div>
+
+      <div class="feature-card">
+        <h3>Ubuntu / Debian APT PPA</h3>
+        <p style="margin-bottom: 1rem;">Официальный системный репозиторий APT:</p>
+        <code style="display:block; background:var(--code-bg); padding:0.6rem; border-radius:6px; color:#fb923c; font-family:var(--font-mono); font-size:0.85rem;">curl -sS https://eminsk.github.io/ppa/setup.sh | sudo bash</code>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-col">
+          <h5>⚡ pureapk / pyapk</h5>
+          <p style="font-size: 0.85rem; line-height: 1.5;">High-performance pure Python APK engine, multi-store packager, and framework toolchain with zero dependencies.</p>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="foot-links">Ресурсы</h5>
+          <ul>
+            <li><a href="https://github.com/eminsk/pyapk" target="_blank">GitHub Repository</a></li>
+            <li><a href="https://pypi.org/project/pureapk/" target="_blank">PyPI Project Page</a></li>
+            <li><a href="https://anaconda.org/m_n_nik/pureapk" target="_blank">Anaconda Conda Channel</a></li>
+            <li><a href="https://eminsk.github.io/ppa/" target="_blank">Ubuntu/Debian APT PPA</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="foot-doc">Документация</h5>
+          <ul>
+            <li><a href="https://github.com/eminsk/pyapk/blob/main/README_RU.md" target="_blank">Русская документация</a></li>
+            <li><a href="https://github.com/eminsk/pyapk#readme" target="_blank">English README</a></li>
+            <li><a href="https://github.com/eminsk/pyapk/releases" target="_blank">GitHub Releases</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h5 data-i18n="foot-donate">Поддержать автора</h5>
+          <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">USDT (TRC-20):</p>
+          <code style="display:block; word-break:break-all; font-size:0.75rem; color:#34d399; background:rgba(255,255,255,0.05); padding:0.4rem; border-radius:4px;">TDVbEdnpgNgoAhNcn1EwXxWHiR3RKLit5P</code>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        MIT License • Copyright © 2026 eminsk. Built with passion for pure Python.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Tab switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      const target = document.getElementById('tab-' + tabId);
+      if (target) target.classList.add('active');
+    }
+
+    // Copy helper
+    function copyInstall(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const oldText = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.color = '#34d399';
+        setTimeout(() => { btn.innerText = oldText; btn.style.color = ''; }, 2000);
+      });
+    }
+
+    function copyCode(elemId) {
+      const code = document.getElementById(elemId).innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = event.target;
+        const oldText = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.style.color = '#34d399';
+        setTimeout(() => { btn.innerText = oldText; btn.style.color = ''; }, 2000);
+      });
+    }
+
+    // CLI search filter
+    function filterCliTable() {
+      const input = document.getElementById('cliSearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#cliTable tbody tr');
+      rows.forEach(row => {
+        const text = row.innerText.toLowerCase();
+        row.style.display = text.includes(input) ? '' : 'none';
+      });
+    }
+
+    // Bilingual dictionary
+    let currentLang = 'ru';
+    const i18n = {
+      ru: {
+        'nav-features': 'Преимущества',
+        'nav-frameworks': 'Фреймворки',
+        'nav-modding': 'Моддинг APK',
+        'nav-cli': 'CLI команды',
+        'nav-install': 'Установка',
+        'hero-badge': '🚀 Версия 1.0.1 • Production / Stable • 0 Внешних Зависимостей',
+        'hero-title': 'Pure Python Движок для <br><span class="gradient-text">Android APK & Мульти-Стор Упаковщик</span>',
+        'hero-desc': 'Забудьте про гигабайты Android SDK, NDK, Java и Gradle. Скоростной парсинг через zero-copy memoryview, нативное 16-килобайтное выравнивание под Android 15, распаковка Android Wheels и экспорт в Google Play, Apple App Store и Windows Store.',
+        'feat-header': 'Почему pureapk уникален?',
+        'feat-sub': 'Создан с бескомпромиссным вниманием к автономности, скорости и отсутствию внешнего мусора.',
+        'feat-1-title': 'Без Java и Android Studio',
+        'feat-1-desc': 'Никаких 15–20 ГБ SDK, NDK, OpenJDK и Gradle. Все операции с APK (бинарный AXML, DEX, 16KB-выравнивание, подпись) работают на 100% чистом Python за секунды.',
+        'feat-2-title': 'Android 15 Ready (16KB)',
+        'feat-2-desc': 'Нативная реализация стандарта Google 16KB Page Alignment для бинарников .so с официальным тегом 0xd935. Больше не нужен системный zipalign.exe.',
+        'feat-3-title': 'Моддинг и Доработка APK',
+        'feat-3-desc': 'Извлечение любого существующего APK, замена кода или манифеста, добавление wheels, авто-очистка старого META-INF/ и переподпись v1/v2 в одну команду.',
+        'feat-4-title': 'Мульти-Стор Вселенная',
+        'feat-4-desc': 'Прямая генерация пакетов для Google Play (.aab), Apple App Store (.ipa с Info.plist), Microsoft Store (.msix с 64KB AppxBlockMap) и китайских сторов (--channel).',
+        'feat-5-title': 'Android Wheels & Cython CI',
+        'feat-5-desc': 'Инспекция и распаковка предсобранных .whl пакетов с раскладкой .so в lib/<abi>/. Авто-генератор GitHub Actions CI для сборки Cython NDK в облаке.',
+        'feat-6-title': 'Zero-Copy & No-GIL',
+        'feat-6-desc': 'Использование __slots__ во всех классах, парсинг срезами memoryview и 100% подтверждённая потокобезопасность на Python 3.13t–3.16t (Free-Threaded No-GIL) и PyPy.',
+        'fw-header': 'Поддержка Всех Популярных GUI Фреймворков',
+        'fw-sub': 'Шаблонизация, синтез манифестов и мгновенная упаковка в APK в один клик.',
+        'mod-header': 'Доработка, Моддинг и Переподпись Готовых APK',
+        'mod-sub': 'Полный рабочий цикл обновления существующих APK без единой строчки Java или Android SDK.',
+        'step-1-title': 'Распаковка APK',
+        'step-1-desc': 'Извлеките файлы, ассеты, манифест и код из любого существующего APK-файла.',
+        'step-2-title': 'Внесение Доработок',
+        'step-2-desc': 'Обновите код, подкиньте нативные Android Wheels (.whl) или чистые библиотеки из PyPI.',
+        'step-3-title': 'Выравнивание & Подпись',
+        'step-3-desc': 'Сборка v2: очищает старый META-INF/, выравнивает под Android 15 (16KB) и подписывает v1/v2.',
+        'cli-header': 'Справочник Команд CLI',
+        'cli-sub': 'Интерактивный поиск по встроенным инструментам pureapk / pyapk.',
+        'inst-header': 'Центр Установки',
+        'inst-sub': 'Доступно во всех ведущих репозиториях пакетов.',
+        'foot-links': 'Ресурсы',
+        'foot-doc': 'Документация',
+        'foot-donate': 'Поддержать автора'
+      },
+      en: {
+        'nav-features': 'Features',
+        'nav-frameworks': 'Frameworks',
+        'nav-modding': 'APK Modding',
+        'nav-cli': 'CLI Reference',
+        'nav-install': 'Install',
+        'hero-badge': '🚀 Version 1.0.1 • Production / Stable • Zero External Dependencies',
+        'hero-title': 'Pure Python Engine for <br><span class="gradient-text">Android APK & Multi-Store Packaging</span>',
+        'hero-desc': 'Forget gigabytes of Android SDK, NDK, Java, and Gradle. Zero-copy memoryview parsing, native Android 15 16KB page alignment, Android Wheels extraction, and multi-store distribution to Google Play, Apple App Store, and Windows Store.',
+        'feat-header': 'Why pureapk Stands Alone',
+        'feat-sub': 'Engineered with uncompromising dedication to autonomy, speed, and zero external bloat.',
+        'feat-1-title': 'Zero Java & Zero Studio',
+        'feat-1-desc': 'Completely eliminates 15–20 GB of SDK, NDK, OpenJDK, and Gradle. All APK operations (AXML, DEX, 16KB alignment, signing) run in pure Python in seconds.',
+        'feat-2-title': 'Android 15 Ready (16KB)',
+        'feat-2-desc': 'Native implementation of Google 16KB Page Alignment for .so libraries using official tag 0xd935. No external zipalign binary needed.',
+        'feat-3-title': 'APK Modding & Patching',
+        'feat-3-desc': 'Extract any existing APK, patch code/manifest, inject wheels, automatically wipe stale META-INF/, and re-sign with fresh v1/v2 signatures.',
+        'feat-4-title': 'Multi-Store Distribution',
+        'feat-4-desc': 'Direct packaging for Google Play (.aab), Apple App Store (.ipa with Info.plist), Microsoft Store (.msix with AppxBlockMap), and Chinese stores (--channel).',
+        'feat-5-title': 'Android Wheels & Cython CI',
+        'feat-5-desc': 'Inspect and unpack pre-built .whl packages into lib/<abi>/ and project folders. Scaffolds cloud GitHub Actions CI for Cython NDK builds.',
+        'feat-6-title': 'Zero-Copy & No-GIL',
+        'feat-6-desc': 'Strict __slots__ on all classes, zero-copy memoryview slicing, and 100% verified thread safety on Free-Threaded No-GIL (Python 3.13t–3.16t) & PyPy.',
+        'fw-header': 'First-Class Support for Python GUI Frameworks',
+        'fw-sub': 'Project scaffolding, manifest synthesis, and direct one-click APK packaging.',
+        'mod-header': 'Patching, Modding & Re-signing Existing APKs',
+        'mod-sub': 'Complete workflow to upgrade and re-sign APKs without a single line of Java or Android SDK.',
+        'step-1-title': 'Extract APK',
+        'step-1-desc': 'Extract assets, resources, manifest, and Python code from any existing APK container.',
+        'step-2-title': 'Apply Patches',
+        'step-2-desc': 'Update code, inject native Android Wheels (.whl), or install pure Python dependencies.',
+        'step-3-title': 'Align & Re-sign',
+        'step-3-desc': 'Pack v2: strips stale signatures, aligns for Android 15 (16KB), and signs with fresh certificates.',
+        'cli-header': 'CLI Command Reference',
+        'cli-sub': 'Interactive search across all built-in pureapk / pyapk toolchains.',
+        'inst-header': 'Installation Hub',
+        'inst-sub': 'Available across all premier package ecosystems.',
+        'foot-links': 'Resources',
+        'foot-doc': 'Documentation',
+        'foot-donate': 'Support Development'
+      }
+    };
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'ru' ? 'en' : 'ru';
+      document.getElementById('langToggle').innerText = currentLang === 'ru' ? '🇬🇧 EN' : '🇷🇺 RU';
+      document.querySelectorAll('[data-i18n]').forEach(elem => {
+        const key = elem.getAttribute('data-i18n');
+        if (i18n[currentLang][key]) {
+          elem.innerHTML = i18n[currentLang][key];
+        }
+      });
+      document.getElementById('cliSearch').placeholder = currentLang === 'ru' 
+        ? 'Поиск по командам (например: zipalign, wheel, aab, sign)...' 
+        : 'Search commands (e.g. zipalign, wheel, aab, sign)...';
+    }
+  </script>
+</body>
+</html>

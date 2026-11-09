@@ -195,36 +195,48 @@ def patch_arsc_private_version(arsc: bytes, new_version: str) -> bytes:
 
 
 
-def _find_python310() -> Optional[str]:
-    """Locate Python 3.10 executable on host to compile compatible bytecode for p4a Android runtime."""
+def _detect_runtime_python_version(src: Path) -> Optional[str]:
+    """Detect targeted Python runtime version (e.g. '3.8', '3.9', '3.10', '3.11', '3.12') from native libraries."""
+    import re
+    for abi in ("arm64-v8a", "armeabi-v7a", "x86_64", "x86"):
+        abi_dir = src / "lib" / abi
+        if abi_dir.is_dir():
+            for f in abi_dir.iterdir():
+                m = re.match(r"libpython(3\.\d+)\.so", f.name)
+                if m:
+                    return m.group(1)
+    return None
+
+
+def _find_python(target_version: str = "3.10") -> Optional[str]:
+    """Locate Python executable on host for a specific target version to compile compatible bytecode."""
     import shutil
     uv_bin = shutil.which("uv")
     if uv_bin:
         try:
             import subprocess
-            res = subprocess.run([uv_bin, "python", "find", "3.10"], capture_output=True, text=True, timeout=5)
+            res = subprocess.run([uv_bin, "python", "find", target_version], capture_output=True, text=True, timeout=5)
             if res.returncode == 0:
                 lines = [line.strip() for line in res.stdout.strip().splitlines() if line.strip() and not line.strip().startswith("warning:")]
                 if lines and os.path.exists(lines[-1]):
                     return lines[-1]
         except Exception:
             pass
-    p = shutil.which("python3.10")
+    p = shutil.which(f"python{target_version}")
     if p:
         return p
-    win_uv = Path.home() / "AppData" / "Roaming" / "uv" / "python" / "cpython-3.10-windows-x86_64-none" / "python.exe"
+    win_uv = Path.home() / "AppData" / "Roaming" / "uv" / "python" / f"cpython-{target_version}-windows-x86_64-none" / "python.exe"
     if win_uv.exists():
         return str(win_uv)
     return None
 
 
-def _compile_py_bytecode(full_path: Path, filename: str, target_py310: bool = False) -> Optional[bytes]:
-    """Compile Python source to timestamp-based .pyc bytecode.
-    If target_py310 is True, produce Python 3.10 compatible bytecode (magic 6f0d0d0a).
-    """
+def _compile_py_bytecode(full_path: Path, filename: str, target_version: Optional[str] = None) -> Optional[bytes]:
+    """Compile Python source to timestamp-based .pyc bytecode compatible with target runtime version."""
     import sys
     source_bytes = full_path.read_bytes()
-    if not target_py310 or sys.version_info[:2] == (3, 10):
+    host_ver = f"{sys.version_info[0]}.{sys.version_info[1]}"
+    if target_version is None or target_version == host_ver:
         try:
             import importlib._bootstrap_external
             code_obj = compile(source_bytes, filename, "exec")
@@ -232,16 +244,16 @@ def _compile_py_bytecode(full_path: Path, filename: str, target_py310: bool = Fa
         except Exception:
             return None
 
-    # Subprocess via host python 3.10
-    py310 = _find_python310()
-    if not py310:
+    # Subprocess via target python version
+    py_bin = _find_python(target_version)
+    if not py_bin:
         return None
     try:
         import subprocess, tempfile
         with tempfile.NamedTemporaryFile(suffix=".pyc", delete=False) as tmp:
             tmp_path = tmp.name
         res = subprocess.run(
-            [py310, "-c", "import py_compile, sys; py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)", str(full_path), tmp_path],
+            [py_bin, "-c", "import py_compile, sys; py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)", str(full_path), tmp_path],
             capture_output=True, timeout=10,
         )
         if res.returncode == 0 and os.path.exists(tmp_path):
@@ -411,8 +423,8 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
                     if builder._compile_py and f.endswith(".py"):
                         existing_pyc = full_f.parent / f"{f}c"
                         if not existing_pyc.exists():
-                            has_py310_runtime = any((src / "lib" / abi / "libpython3.10.so").exists() for abi in ("arm64-v8a", "armeabi-v7a"))
-                            pyc_bytes = _compile_py_bytecode(full_f, f, target_py310=has_py310_runtime)
+                            target_py_ver = _detect_runtime_python_version(src)
+                            pyc_bytes = _compile_py_bytecode(full_f, f, target_version=target_py_ver)
                             if pyc_bytes:
                                 pyc_ti = tarfile.TarInfo(name=f"{rel_str}c")
                                 pyc_ti.type = tarfile.REGTYPE

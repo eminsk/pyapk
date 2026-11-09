@@ -8,7 +8,7 @@
 [ 🇬🇧 English Documentation ](https://github.com/eminsk/pyapk#readme) | [ 🇷🇺 Документация на русском ](https://github.com/eminsk/pyapk/blob/main/README_RU.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
-[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1)](https://pypi.org/project/pureapk/)
+[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.12.0)](https://pypi.org/project/pureapk/)
 [![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
@@ -18,7 +18,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-85%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -86,7 +86,7 @@ uv add pureapk
 
 ### Install Pre-Built Universal Wheel Directly from GitHub
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v1.0.1/pureapk-1.0.1-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v1.12.0/pureapk-1.12.0-py3-none-any.whl
 ```
 
 ### Ubuntu / Debian (Official APT PPA)
@@ -496,6 +496,16 @@ pureapk extract app_v1.apk ./workspace/
 pureapk install-deps ./workspace/ requests
 pureapk unpack-wheel numpy-android_aarch64.whl ./workspace/
 pureapk pack ./workspace/ -o app_v2.apk --sign
+
+# Build Android or Pure Python Wheels for Any Python Version (cp38 - cp314)
+pureapk pack-wheel my_app/ -o dist/ -n my-app -v 1.0.0 --python-tag cp310 --abi arm64-v8a
+
+# Build Universal Engine Wheels Decoupled from Local Environment
+pureapk pack-wheel -o dist/ -n kivy-engine --framework kivy --python-tag cp310 --abi arm64-v8a
+
+# Verify Apple iOS IPA Package without macOS Hardware (AltStore / Sideloadly ready)
+pureapk verify my_app.ipa
+pureapk verify-ipa my_app.ipa
 
 # Multi-Store Packaging (Google Play AAB, Apple IPA, Microsoft Store MSIX)
 pureapk pack-aab project_dir/ -o app.aab

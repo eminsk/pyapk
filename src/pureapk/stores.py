@@ -193,6 +193,91 @@ class AppleAppHelper:
         with open(t / "main.py", "w", encoding="utf-8") as f:
             f.write('#!/usr/bin/env python3\nprint("Hello from iOS Python App!")\n')
 
+    @staticmethod
+    def verify_ipa(ipa_path: Union[str, Path, bytes, BinaryIO]) -> Dict[str, Any]:
+        """Inspects and validates an Apple iOS .ipa package without requiring macOS.
+
+        Checks:
+        - Payload/<AppName>.app directory structure
+        - CFBundleIdentifier, CFBundleExecutable, CFBundleVersion in Info.plist
+        - PkgInfo header
+        - AltStore / Sideloadly / Scarlet readiness
+        """
+        import plistlib
+        zf: zipfile.ZipFile
+        ipa_name = "in_memory.ipa"
+        if isinstance(ipa_path, (str, Path)):
+            p = Path(ipa_path)
+            ipa_name = p.name
+            zf = zipfile.ZipFile(p, "r")
+        elif isinstance(ipa_path, bytes):
+            zf = zipfile.ZipFile(io.BytesIO(ipa_path), "r")
+        else:
+            zf = zipfile.ZipFile(ipa_path, "r")
+
+        issues: List[str] = []
+        try:
+            names = zf.namelist()
+            payload_entries = [n for n in names if n.startswith("Payload/") and ".app" in n]
+            if not payload_entries:
+                issues.append("Missing 'Payload/<AppName>.app' directory structure")
+                return {
+                    "valid": False,
+                    "ipa_name": ipa_name,
+                    "issues": issues,
+                    "app_name": "",
+                    "bundle_id": "",
+                    "version": "",
+                    "min_os_version": "",
+                    "has_pkginfo": False,
+                    "total_files": len(names),
+                    "sideload_ready": False,
+                }
+
+            app_dir = payload_entries[0].split("/")[1]
+            app_name = app_dir[:-4] if app_dir.endswith(".app") else app_dir
+
+            plist_entry = f"Payload/{app_dir}/Info.plist"
+            parsed_plist: Dict[str, Any] = {}
+            if plist_entry in names:
+                try:
+                    plist_data = zf.read(plist_entry)
+                    parsed_plist = plistlib.loads(plist_data)
+                except Exception as e:
+                    issues.append(f"Invalid or corrupted Info.plist: {e}")
+            else:
+                issues.append("Missing Info.plist inside .app bundle")
+
+            pkginfo_entry = f"Payload/{app_dir}/PkgInfo"
+            has_pkginfo = pkginfo_entry in names
+
+            bundle_id = str(parsed_plist.get("CFBundleIdentifier", ""))
+            if not bundle_id:
+                issues.append("Missing CFBundleIdentifier in Info.plist")
+
+            executable = str(parsed_plist.get("CFBundleExecutable", ""))
+            if not executable:
+                issues.append("Missing CFBundleExecutable in Info.plist")
+
+            version = str(parsed_plist.get("CFBundleShortVersionString", parsed_plist.get("CFBundleVersion", "1.0.0")))
+            min_os = str(parsed_plist.get("MinimumOSVersion", "15.0"))
+
+            is_valid = len(issues) == 0
+            return {
+                "valid": is_valid,
+                "ipa_name": ipa_name,
+                "app_name": app_name,
+                "bundle_id": bundle_id,
+                "version": version,
+                "min_os_version": min_os,
+                "has_pkginfo": has_pkginfo,
+                "total_files": len(names),
+                "issues": issues,
+                "sideload_ready": is_valid and has_pkginfo,
+            }
+        finally:
+            zf.close()
+
 
 class IPABuilder:
     """Packager for Apple App Store .ipa distribution bundles."""

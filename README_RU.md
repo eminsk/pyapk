@@ -8,7 +8,7 @@
 [ 🇬🇧 English Documentation ](https://github.com/eminsk/pyapk#readme) | [ 🇷🇺 Документация на русском ](https://github.com/eminsk/pyapk/blob/main/README_RU.md)
 
 [![Версия релиза](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
-[![Версия PyPI](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1)](https://pypi.org/project/pureapk/)
+[![Версия PyPI](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.12.0)](https://pypi.org/project/pureapk/)
 [![Версия Conda](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![Скачивания PyPI](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
@@ -18,7 +18,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Ноль зависимостей](https://img.shields.io/badge/зависимости-0%20внешних-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Платформы](https://img.shields.io/badge/платформы-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Тесты](https://img.shields.io/badge/тесты-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Тесты](https://img.shields.io/badge/тесты-85%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Матрица](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![Лицензия: MIT](https://img.shields.io/badge/Лицензия-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -86,7 +86,7 @@ uv add pureapk
 
 ### Установка готового универсального колеса прямо из GitHub Releases
 ```bash
-pip install https://github.com/eminsk/pyapk/releases/download/v1.0.1/pureapk-1.0.1-py3-none-any.whl
+pip install https://github.com/eminsk/pyapk/releases/download/v1.12.0/pureapk-1.12.0-py3-none-any.whl
 ```
 
 ### Установка в Ubuntu / Debian через официальный репозиторий APT (PPA)

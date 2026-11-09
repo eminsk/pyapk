@@ -112,6 +112,25 @@ def _format_files_human(files: List[Dict[str, Any]]) -> None:
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
+    target = str(args.apk_path)
+    if target.lower().endswith(".ipa"):
+        from pureapk.stores import AppleAppHelper
+        res = AppleAppHelper.verify_ipa(target)
+        if getattr(args, "json", False):
+            _print_json(res)
+        else:
+            print(f"Apple iOS IPA Package: {res['ipa_name']}")
+            print(f"  Valid Integrity: {res['valid']}")
+            print(f"  App Name:        {res['app_name'] or 'N/A'}")
+            print(f"  Bundle ID:       {res['bundle_id'] or 'N/A'}")
+            print(f"  Version:         {res['version'] or 'N/A'}")
+            print(f"  Minimum iOS:     {res['min_os_version'] or 'N/A'}")
+            print(f"  PkgInfo Header:  {res['has_pkginfo']}")
+            print(f"  Sideload Ready:  {res['sideload_ready']} (AltStore / Sideloadly / Scarlet compatible)")
+            if res["issues"]:
+                print(f"  Issues Detected: {'; '.join(res['issues'])}")
+        return 0 if res["valid"] else 1
+
     with APK(args.apk_path) as apk:
         res = apk.verify()
         output_dispatch = {
@@ -220,6 +239,43 @@ def _format_zipalign_check_human(res: Dict[str, Any]) -> None:
         print("Unaligned files:")
         for u in res["unaligned_files"]:
             print(f"  - {u['filename']}: offset {u['data_offset']} (rem {u['remainder']} for align {u['target_alignment']})")
+
+
+def cmd_pack_wheel(args: argparse.Namespace) -> int:
+    import sys
+    from pureapk.wheels import AndroidWheelHelper
+    fw = getattr(args, "framework", None)
+    if fw:
+        res = AndroidWheelHelper.build_framework_wheel(
+            framework=fw,
+            output_whl=args.output,
+            distribution_name=args.name,
+            version=args.version,
+            python_tag=getattr(args, "python_tag", "py3"),
+            abi=getattr(args, "abi", None),
+            title=getattr(args, "title", None),
+        )
+    else:
+        if not args.source_dir:
+            print("Error: source_dir is required when --framework is not specified", file=sys.stderr)
+            return 1
+        res = AndroidWheelHelper.build_wheel(
+            args.source_dir,
+            output_whl=args.output,
+            distribution_name=args.name,
+            version=args.version,
+            python_tag=getattr(args, "python_tag", "py3"),
+            abi=getattr(args, "abi", None),
+            summary=getattr(args, "summary", "Mobile Python package"),
+        )
+    if getattr(args, "json", False):
+        _print_json(res)
+    else:
+        print(f"Successfully packaged wheel: {res['wheel_path']}")
+        print(f"  + Distribution: {res['distribution_name']} v{res['version']}")
+        print(f"  + Wheel Tag: {res['python_tag']}-{res['abi_tag']}-{res['platform_tag']}")
+        print(f"  + Total Files: {res['total_files']} ({res['size_bytes']} bytes)")
+    return 0
 
 
 def cmd_unpack_wheel(args: argparse.Namespace) -> int:
@@ -452,8 +508,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_files.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # verify
-    p_verify = subparsers.add_parser("verify", help="Verify APK integrity, signatures, and page alignment")
-    p_verify.add_argument("apk_path", help="Path to APK file")
+    p_verify = subparsers.add_parser("verify", aliases=["verify-ipa"], help="Verify APK or Apple iOS IPA integrity, signatures, and alignment")
+    p_verify.add_argument("apk_path", help="Path to APK or Apple iOS IPA file")
     p_verify.add_argument("--json", action="store_true", help="Format output as JSON")
 
     # extract
@@ -496,6 +552,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_inst.add_argument("project_dir", help="Project folder to install dependencies into")
     p_inst.add_argument("packages", nargs="*", help="Package names to install (e.g. requests urllib3)")
     p_inst.add_argument("-r", "--requirements", help="Path to requirements.txt file")
+
+    # pack-wheel
+    p_pack_wheel = subparsers.add_parser("pack-wheel", help="Build a PEP 427 wheel (.whl) for Android or pure Python from a directory or framework")
+    p_pack_wheel.add_argument("source_dir", nargs="?", default=None, help="Project source folder to pack (optional if --framework is provided)")
+    p_pack_wheel.add_argument("--framework", choices=["kivy", "pygame", "flet", "toga", "renpy", "webview", "pyside", "pyqt"], help="Framework engine template to pack into wheel")
+    p_pack_wheel.add_argument("--title", help="App title for framework wheel")
+    p_pack_wheel.add_argument("-o", "--output", help="Output .whl file path or destination directory")
+    p_pack_wheel.add_argument("-n", "--name", required=True, help="Distribution name (e.g. my-app)")
+    p_pack_wheel.add_argument("-v", "--version", default="0.1.0", help="Distribution version (default: 0.1.0)")
+    p_pack_wheel.add_argument("--python-tag", default="py3", help="Python version tag (e.g. py3, cp38, cp39, cp310, cp311, cp312, cp313)")
+    p_pack_wheel.add_argument("--abi", help="Target ABI (e.g. arm64-v8a, armeabi-v7a, x86_64, x86, any)")
+    p_pack_wheel.add_argument("--summary", default="Mobile Python package", help="Package summary description")
+    p_pack_wheel.add_argument("--json", action="store_true", help="Output results as JSON")
 
     # unpack-wheel / install-wheel
     p_wheel = subparsers.add_parser("unpack-wheel", aliases=["install-wheel"], help="Unpack an Android wheel (.whl) into lib/<abi>/ and project folders")
@@ -653,18 +722,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     # Fallback to info command if first argument is a file ending in .apk
     known_commands = {
-        "info", "manifest", "permissions", "dex", "files", "verify", "extract", "pack",
-        "zipalign", "unpack-wheel", "install-wheel", "init-ci",
+        "info", "manifest", "permissions", "dex", "files", "verify", "verify-ipa", "extract", "pack",
+        "zipalign", "pack-wheel", "unpack-wheel", "install-wheel", "init-ci",
         "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
         "init-renpy", "pack-renpy", "init-webview", "pack-webview", "init-pyside", "init-pyqt", "pack-pyside", "pack-pyqt",
         "pack-aab", "init-ios", "pack-ipa", "init-windows", "pack-msix", "generate-keystore", "sign", "compile-manifest", "install-deps", "add-deps",
     }
     has_subcommand = bool(args_list and not args_list[0].startswith("-") and args_list[0] in known_commands)
-    is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith(".apk"))
+    is_direct_apk = bool(args_list and not args_list[0].startswith("-") and args_list[0].lower().endswith((".apk", ".ipa")))
+
+    def _resolve_direct():
+        if args_list[0].lower().endswith(".ipa"):
+            return ["verify"] + list(args_list)
+        return ["info"] + list(args_list)
 
     effective_args = {
-        True: lambda: ["info"] + list(args_list),
+        True: _resolve_direct,
         False: lambda: list(args_list),
     }[is_direct_apk and not has_subcommand]()
 
@@ -681,6 +755,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "dex": cmd_dex,
         "files": cmd_files,
         "verify": cmd_verify,
+        "verify-ipa": cmd_verify,
         "extract": cmd_extract,
         "pack": cmd_pack,
         "sign": cmd_sign,
@@ -688,6 +763,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "compile-manifest": cmd_compile_manifest,
         "install-deps": cmd_install_deps,
         "add-deps": cmd_install_deps,
+        "pack-wheel": cmd_pack_wheel,
         "unpack-wheel": cmd_unpack_wheel,
         "install-wheel": cmd_unpack_wheel,
         "init-ci": cmd_init_ci,

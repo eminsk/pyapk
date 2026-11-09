@@ -220,11 +220,23 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
                 arc_name = f"assets/{af_rel}".replace("\\", "/")
 
-                builder.add_file(af_full, arc_name)
-
                 if arc_name == "assets/private.tar":
 
                     has_custom_private_tar = True
+
+                    data = af_full.read_bytes()
+
+                    if not data.startswith(b"\x1f\x8b"):
+
+                        import gzip
+
+                        data = gzip.compress(data)
+
+                    builder.add_bytes(arc_name, data, compress=True)
+
+                else:
+
+                    builder.add_file(af_full, arc_name)
 
 
 
@@ -238,7 +250,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
 
 
-    # 5. Bundle Python codebase into assets/private.tar and assets/private.mp3 (p4a standard)
+    # 5. Bundle Python codebase into assets/private.tar (p4a standard requires gzip-compressed tar)
 
     if not has_custom_private_tar:
 
@@ -254,7 +266,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
         has_files = False
 
-        with tarfile.open(fileobj=tar_buf, mode="w") as tf:
+        with tarfile.open(fileobj=tar_buf, mode="w:gz") as tf:
 
             for root, _, files in os.walk(src):
 
@@ -274,7 +286,7 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
                         continue
 
-                    if f.endswith((".apk", ".aab", ".ipa", ".msix", ".pyc", ".dex")) or f == "resources.arsc":
+                    if f.endswith((".apk", ".aab", ".ipa", ".msix", ".dex")) or f == "resources.arsc":
 
                         continue
 
@@ -286,17 +298,13 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
 
 
-                    # Include .pyc if available or if host python matches target
+                    # Include .pyc if compiling and not already present on disk
 
                     if builder._compile_py and f.endswith(".py"):
 
                         existing_pyc = full_f.parent / f"{f}c"
 
-                        if existing_pyc.exists():
-
-                            tf.add(str(existing_pyc), arcname=f"{rel_str}c")
-
-                        else:
+                        if not existing_pyc.exists():
 
                             has_py310_runtime = any((src / "lib" / abi / "libpython3.10.so").exists() for abi in ("arm64-v8a", "armeabi-v7a"))
 
@@ -324,12 +332,13 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
 
                                     pass
 
+
+
         tar_bytes = tar_buf.getvalue()
 
         if has_files and tar_bytes:
 
-            builder.add_bytes("assets/private.tar", tar_bytes, compress=False)
-
+            builder.add_bytes("assets/private.tar", tar_bytes, compress=True)
             builder.add_bytes("assets/private.mp3", tar_bytes, compress=False)
 
 

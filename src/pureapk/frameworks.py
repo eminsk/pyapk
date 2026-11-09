@@ -195,6 +195,67 @@ def patch_arsc_private_version(arsc: bytes, new_version: str) -> bytes:
 
 
 
+def _find_python310() -> Optional[str]:
+    """Locate Python 3.10 executable on host to compile compatible bytecode for p4a Android runtime."""
+    import shutil
+    uv_bin = shutil.which("uv")
+    if uv_bin:
+        try:
+            import subprocess
+            res = subprocess.run([uv_bin, "python", "find", "3.10"], capture_output=True, text=True, timeout=5)
+            if res.returncode == 0:
+                lines = [line.strip() for line in res.stdout.strip().splitlines() if line.strip() and not line.strip().startswith("warning:")]
+                if lines and os.path.exists(lines[-1]):
+                    return lines[-1]
+        except Exception:
+            pass
+    p = shutil.which("python3.10")
+    if p:
+        return p
+    win_uv = Path.home() / "AppData" / "Roaming" / "uv" / "python" / "cpython-3.10-windows-x86_64-none" / "python.exe"
+    if win_uv.exists():
+        return str(win_uv)
+    return None
+
+
+def _compile_py_bytecode(full_path: Path, filename: str, target_py310: bool = False) -> Optional[bytes]:
+    """Compile Python source to timestamp-based .pyc bytecode.
+    If target_py310 is True, produce Python 3.10 compatible bytecode (magic 6f0d0d0a).
+    """
+    import sys
+    source_bytes = full_path.read_bytes()
+    if not target_py310 or sys.version_info[:2] == (3, 10):
+        try:
+            import importlib._bootstrap_external
+            code_obj = compile(source_bytes, filename, "exec")
+            return importlib._bootstrap_external._code_to_timestamp_pyc(code_obj)
+        except Exception:
+            return None
+
+    # Subprocess via host python 3.10
+    py310 = _find_python310()
+    if not py310:
+        return None
+    try:
+        import subprocess, tempfile
+        with tempfile.NamedTemporaryFile(suffix=".pyc", delete=False) as tmp:
+            tmp_path = tmp.name
+        res = subprocess.run(
+            [py310, "-c", "import py_compile, sys; py_compile.compile(sys.argv[1], cfile=sys.argv[2], doraise=True)", str(full_path), tmp_path],
+            capture_output=True, timeout=10,
+        )
+        if res.returncode == 0 and os.path.exists(tmp_path):
+            with open(tmp_path, "rb") as f:
+                data = f.read()
+            os.unlink(tmp_path)
+            return data
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+    except Exception:
+        pass
+    return None
+
+
 def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False, channel: Optional[str] = None) -> None:
 
     """Packages framework project folders: lib/, res/, assets/, root DEX/resources, and private python tarballs."""
@@ -308,85 +369,59 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
         has_files = False
 
         excluded_top = ("lib", "res", "assets", "META-INF", ".git", ".venv", "__pycache__", ".pytest_cache", ".idea", ".vscode", "dist", "build", "tests")
-        with tarfile.open(fileobj=tar_buf, mode="w:gz") as tf:
-
+        with tarfile.open(fileobj=tar_buf, mode="w:gz", format=tarfile.USTAR_FORMAT) as tf:
             for root, dirs, files in os.walk(src):
-
                 dirs[:] = [d for d in dirs if d not in excluded_top and not d.endswith((".dist-info", ".egg-info"))]
 
-                # Explicitly add directory entries so jtar/AssetExtract creates subfolders
+                # Explicitly add directory entries (USTAR DIRTYPE '5' with trailing '/')
+                # so p4a's jtar / AssetExtract creates subdirectories without PAX headers.
                 if Path(root) != src:
                     rel_dir = Path(root).relative_to(src)
                     if rel_dir.parts[0] not in excluded_top:
-                        rel_dir_str = str(rel_dir).replace("\\", "/")
-                        tf.add(str(root), arcname=rel_dir_str, recursive=False)
+                        dir_name = rel_dir.as_posix()
+                        if not dir_name.endswith("/"):
+                            dir_name += "/"
+                        dti = tarfile.TarInfo(name=dir_name)
+                        dti.type = tarfile.DIRTYPE
+                        dti.mode = 0o755
+                        dti.mtime = int(Path(root).stat().st_mtime)
+                        tf.addfile(dti)
 
                 for f in files:
-
                     full_f = Path(root) / f
-
                     rel_f = full_f.relative_to(src)
-
                     rel_parts = rel_f.parts
-
                     if rel_parts[0] in excluded_top or rel_parts[0].endswith((".dist-info", ".egg-info")):
-
                         continue
-
                     if rel_parts[0] in ("AndroidManifest.xml", "buildozer.spec", ".lock", ".gitignore", "pyproject.toml", "README.md", "uv.lock", ".python-version"):
-
                         continue
-
                     if f.endswith((".apk", ".aab", ".ipa", ".msix", ".dex")) or f == "resources.arsc":
-
                         continue
-
-                    rel_str = str(rel_f).replace("\\", "/")
-
-                    tf.add(str(full_f), arcname=rel_str)
-
+                    rel_str = rel_f.as_posix()
+                    file_bytes = full_f.read_bytes()
+                    fti = tarfile.TarInfo(name=rel_str)
+                    fti.type = tarfile.REGTYPE
+                    fti.size = len(file_bytes)
+                    fti.mode = 0o644
+                    fti.mtime = int(full_f.stat().st_mtime)
+                    tf.addfile(fti, io.BytesIO(file_bytes))
                     has_files = True
 
-
-
                     # Include .pyc if compiling and not already present on disk
-
                     if builder._compile_py and f.endswith(".py"):
-
                         existing_pyc = full_f.parent / f"{f}c"
-
                         if not existing_pyc.exists():
-
                             has_py310_runtime = any((src / "lib" / abi / "libpython3.10.so").exists() for abi in ("arm64-v8a", "armeabi-v7a"))
-
-                            if not has_py310_runtime or sys.version_info[:2] == (3, 10):
-
-                                try:
-
-                                    import importlib._bootstrap_external
-
-                                    source_bytes = full_f.read_bytes()
-
-                                    code_obj = compile(source_bytes, f, "exec")
-
-                                    pyc_bytes = importlib._bootstrap_external._code_to_timestamp_pyc(code_obj)
-
-                                    pyc_ti = tarfile.TarInfo(name=f"{rel_str}c")
-
-                                    pyc_ti.size = len(pyc_bytes)
-
-                                    pyc_ti.mtime = int(full_f.stat().st_mtime)
-
-                                    tf.addfile(pyc_ti, io.BytesIO(pyc_bytes))
-
-                                except Exception:
-
-                                    pass
-
-
+                            pyc_bytes = _compile_py_bytecode(full_f, f, target_py310=has_py310_runtime)
+                            if pyc_bytes:
+                                pyc_ti = tarfile.TarInfo(name=f"{rel_str}c")
+                                pyc_ti.type = tarfile.REGTYPE
+                                pyc_ti.size = len(pyc_bytes)
+                                pyc_ti.mode = 0o644
+                                pyc_ti.mtime = int(full_f.stat().st_mtime)
+                                tf.addfile(pyc_ti, io.BytesIO(pyc_bytes))
 
         tar_bytes = tar_buf.getvalue()
-
         if has_files and tar_bytes:
 
             builder.add_bytes("assets/private.tar", tar_bytes, compress=False)

@@ -270,9 +270,15 @@ class APKSigner:
         # 4. Pack v1-signed ZIP with page alignment
         v1_buf = io.BytesIO()
         with zipfile.ZipFile(v1_buf, "w") as zf:
-            zf.writestr("META-INF/MANIFEST.MF", manifest_data)
-            zf.writestr("META-INF/CERT.SF", sf_data)
-            zf.writestr("META-INF/CERT.RSA", cert_rsa_data)
+            for meta_name, meta_data in (
+                ("META-INF/MANIFEST.MF", manifest_data),
+                ("META-INF/CERT.SF", sf_data),
+                ("META-INF/CERT.RSA", cert_rsa_data),
+            ):
+                minfo = zipfile.ZipInfo(meta_name)
+                minfo.compress_type = zipfile.ZIP_DEFLATED
+                minfo.external_attr = 0o644 << 16
+                zf.writestr(minfo, meta_data)
             for name in sorted(entries.keys()):
                 old_info, data = entries[name]
                 info = zipfile.ZipInfo(old_info.filename)

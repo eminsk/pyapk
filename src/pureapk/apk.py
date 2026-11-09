@@ -305,6 +305,7 @@ class APK:
         """Checks if uncompressed files are aligned to page boundaries (16KB for .so, 4B for others)."""
         zf = self.zip_file
         unaligned: List[Dict[str, Any]] = []
+        uncompressed_so_count = 0
         aligned_so_count = 0
         total_so_count = 0
 
@@ -316,6 +317,8 @@ class APK:
                 total_so_count += 1
 
             if info.compress_type == zipfile.ZIP_STORED:
+                if is_so:
+                    uncompressed_so_count += 1
                 target_align = so_alignment if is_so else file_alignment
                 fn_bytes = info.filename.encode("utf-8")
                 data_offset = info.header_offset + 30 + len(fn_bytes) + len(info.extra)
@@ -330,8 +333,8 @@ class APK:
                 elif is_so:
                     aligned_so_count += 1
 
-        is_16k_compliant = (total_so_count == 0) or (
-            aligned_so_count == total_so_count and not any(u["filename"].endswith(".so") for u in unaligned)
+        is_16k_compliant = (uncompressed_so_count == 0) or (
+            aligned_so_count == uncompressed_so_count and not any(u["filename"].endswith(".so") for u in unaligned)
         )
 
         return {

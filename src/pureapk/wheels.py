@@ -9,8 +9,12 @@ Supports unpacking pre-compiled binary Python wheels for Android:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import io
+import os
 from pathlib import Path
+import re
 from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
 import zipfile
 
@@ -26,6 +30,31 @@ class AndroidWheelHelper:
         "x86_64",
         "x86",
     )
+
+    ABI_TO_PLATFORM_TAG: Dict[str, str] = {
+        "arm64-v8a": "android_24_arm64_v8a",
+        "armeabi-v7a": "android_24_armeabi_v7a",
+        "x86_64": "android_24_x86_64",
+        "x86": "android_24_x86",
+    }
+
+    PLATFORM_TAG_TO_ABI: Dict[str, str] = {
+        "android_24_arm64_v8a": "arm64-v8a",
+        "android_arm64_v8a": "arm64-v8a",
+        "android_aarch64": "arm64-v8a",
+        "linux_aarch64": "arm64-v8a",
+        "android_24_armeabi_v7a": "armeabi-v7a",
+        "android_armeabi_v7a": "armeabi-v7a",
+        "android_armv7l": "armeabi-v7a",
+        "linux_armv7l": "armeabi-v7a",
+        "android_24_x86_64": "x86_64",
+        "android_x86_64": "x86_64",
+        "linux_x86_64": "x86_64",
+        "android_24_x86": "x86",
+        "android_x86": "x86",
+        "android_i686": "x86",
+        "linux_i686": "x86",
+    }
 
     @classmethod
     def detect_abi_from_filename(cls, filename: str) -> Optional[str]:
@@ -165,3 +194,210 @@ class AndroidWheelHelper:
             }
         finally:
             zf.close()
+
+    @classmethod
+    def build_wheel(
+        cls,
+        source_dir: Union[str, Path],
+        output_whl: Optional[Union[str, Path]] = None,
+        distribution_name: str = "app",
+        version: str = "0.1.0",
+        python_tag: str = "py3",
+        abi_tag: Optional[str] = None,
+        platform_tag: Optional[str] = None,
+        abi: Optional[str] = None,
+        summary: str = "Mobile Python package",
+    ) -> Dict[str, Any]:
+        """Builds a PEP 427 standard wheel (.whl) from a source directory.
+
+        Supports:
+        - Pure Python: py3-none-any.whl, py2.py3-none-any.whl
+        - Specific CPython versions: cp38, cp39, cp310, cp311, cp312, cp313, cp314, cp315, cp316, cp316t
+        - Target mobile architectures: arm64-v8a, armeabi-v7a, x86_64, x86
+        """
+        src = Path(source_dir)
+        if not src.is_dir():
+            raise FileNotFoundError(f"Source directory not found: {source_dir}")
+
+        # Normalize distribution name and version for PEP 427 filename
+        dist_slug = re.sub(r"[-_.]+", "_", distribution_name).strip("_")
+        ver_slug = re.sub(r"[-_]+", "_", version).strip("_")
+
+        # Determine platform and ABI tags
+        final_platform = platform_tag
+        if final_platform is None:
+            if abi:
+                final_platform = cls.ABI_TO_PLATFORM_TAG.get(abi, f"android_24_{abi.replace('-', '_')}")
+            else:
+                final_platform = "any"
+
+        final_abi_tag = abi_tag
+        if final_abi_tag is None:
+            if final_platform == "any":
+                final_abi_tag = "none"
+            elif python_tag.startswith("cp"):
+                final_abi_tag = python_tag
+            else:
+                final_abi_tag = "none"
+
+        is_pure = (final_platform == "any" and final_abi_tag == "none")
+        wheel_filename = f"{dist_slug}-{ver_slug}-{python_tag}-{final_abi_tag}-{final_platform}.whl"
+
+        if output_whl is None:
+            out_file = src.parent / wheel_filename
+        else:
+            out_p = Path(output_whl)
+            if out_p.is_dir() or not str(output_whl).lower().endswith(".whl") or str(output_whl).endswith(("/", "\\")):
+                out_p.mkdir(parents=True, exist_ok=True)
+                out_file = out_p / wheel_filename
+            else:
+                out_p.parent.mkdir(parents=True, exist_ok=True)
+                out_file = out_p
+
+        dist_info_dir = f"{dist_slug}-{ver_slug}.dist-info"
+        record_lines: List[str] = []
+        excluded = {".git", ".venv", "__pycache__", ".pytest_cache", ".idea", ".vscode", "build", "dist"}
+
+        with zipfile.ZipFile(out_file, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            total_files = 0
+            # 1. Package source files
+            for root, dirs, files in os.walk(src):
+                dirs[:] = [d for d in dirs if d not in excluded and not d.endswith((".dist-info", ".egg-info"))]
+                for file in files:
+                    if file.endswith((".whl", ".apk", ".aab", ".pyc")):
+                        continue
+                    full_p = Path(root) / file
+                    rel_p = full_p.relative_to(src).as_posix()
+                    if any(part in excluded for part in Path(rel_p).parts):
+                        continue
+                    data = full_p.read_bytes()
+                    zf.writestr(rel_p, data)
+                    digest = base64.urlsafe_b64encode(hashlib.sha256(data).digest()).decode("ascii").rstrip("=")
+                    record_lines.append(f"{rel_p},sha256={digest},{len(data)}")
+                    total_files += 1
+
+            # 2. METADATA
+            metadata_content = (
+                f"Metadata-Version: 2.1\n"
+                f"Name: {distribution_name}\n"
+                f"Version: {version}\n"
+                f"Summary: {summary}\n"
+            ).encode("utf-8")
+            meta_arc = f"{dist_info_dir}/METADATA"
+            zf.writestr(meta_arc, metadata_content)
+            m_digest = base64.urlsafe_b64encode(hashlib.sha256(metadata_content).digest()).decode("ascii").rstrip("=")
+            record_lines.append(f"{meta_arc},sha256={m_digest},{len(metadata_content)}")
+
+            # 3. WHEEL
+            wheel_content = (
+                f"Wheel-Version: 1.0\n"
+                f"Generator: pureapk\n"
+                f"Root-Is-Purelib: {'true' if is_pure else 'false'}\n"
+                f"Tag: {python_tag}-{final_abi_tag}-{final_platform}\n"
+            ).encode("utf-8")
+            wheel_arc = f"{dist_info_dir}/WHEEL"
+            zf.writestr(wheel_arc, wheel_content)
+            w_digest = base64.urlsafe_b64encode(hashlib.sha256(wheel_content).digest()).decode("ascii").rstrip("=")
+            record_lines.append(f"{wheel_arc},sha256={w_digest},{len(wheel_content)}")
+
+            # 4. RECORD
+            record_arc = f"{dist_info_dir}/RECORD"
+            record_lines.append(f"{record_arc},,")
+            record_content = "\n".join(record_lines).encode("utf-8") + b"\n"
+            zf.writestr(record_arc, record_content)
+
+        return {
+            "wheel_path": str(out_file),
+            "wheel_name": out_file.name,
+            "distribution_name": distribution_name,
+            "version": version,
+            "python_tag": python_tag,
+            "abi_tag": final_abi_tag,
+            "platform_tag": final_platform,
+            "total_files": total_files + 3,
+            "size_bytes": out_file.stat().st_size,
+        }
+
+    @classmethod
+    def repack_wheel(
+        cls,
+        wheel_path: Union[str, Path],
+        output_whl: Union[str, Path],
+        target_python_tag: str = "py3",
+        target_abi: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Repacks an existing wheel to retarget a specific Python version or ABI."""
+        info = cls.inspect_wheel(wheel_path)
+        dist_name = info["distribution_name"] or "package"
+        ver = info["version"] or "1.0.0"
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_d:
+            tmp_root = Path(tmp_d)
+            cls.unpack_wheel(wheel_path, tmp_root, strip_dist_info=True)
+            return cls.build_wheel(
+                tmp_root,
+                output_whl=output_whl,
+                distribution_name=dist_name,
+                version=ver,
+                python_tag=target_python_tag,
+                abi=target_abi or info["detected_abi"],
+            )
+
+    @classmethod
+    def build_framework_wheel(
+        cls,
+        framework: str,
+        output_whl: Optional[Union[str, Path]] = None,
+        distribution_name: Optional[str] = None,
+        version: str = "0.1.0",
+        python_tag: str = "py3",
+        abi: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Builds a portable wheel package for any supported framework (kivy, pygame, flet, toga, renpy, webview, pyside).
+
+        Decouples the framework template and runtime structure from any author-specific path,
+        making ready-to-use wheels accessible universally across environments and Python versions.
+        """
+        import tempfile
+        from pureapk.frameworks import (
+            KivyAppHelper,
+            PygameAppHelper,
+            FletAppHelper,
+            TogaAppHelper,
+            RenPyAppHelper,
+            WebViewAppHelper,
+            PySideAppHelper,
+        )
+        helpers: Dict[str, Tuple[Any, str]] = {
+            "kivy": (KivyAppHelper, "kivy-app"),
+            "pygame": (PygameAppHelper, "pygame-app"),
+            "flet": (FletAppHelper, "flet-app"),
+            "toga": (TogaAppHelper, "toga-app"),
+            "renpy": (RenPyAppHelper, "renpy-app"),
+            "webview": (WebViewAppHelper, "webview-app"),
+            "pyside": (PySideAppHelper, "pyside-app"),
+            "pyqt": (PySideAppHelper, "pyqt-app"),
+        }
+        fw_key = framework.lower().strip()
+        if fw_key not in helpers:
+            supported = ", ".join(helpers.keys())
+            raise ValueError(f"Unknown framework '{framework}'. Supported: {supported}")
+
+        helper_cls, default_name = helpers[fw_key]
+        dist_name = distribution_name or default_name
+        app_title = title or dist_name.replace("-", " ").title()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_root = Path(tmp_dir)
+            helper_cls.init_project(tmp_root, title=app_title)
+            return cls.build_wheel(
+                tmp_root,
+                output_whl=output_whl,
+                distribution_name=dist_name,
+                version=version,
+                python_tag=python_tag,
+                abi=abi,
+                summary=f"Pre-packaged {framework.title()} mobile application package",
+            )

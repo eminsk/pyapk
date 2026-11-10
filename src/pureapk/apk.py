@@ -305,6 +305,7 @@ class APK:
         """Checks if uncompressed files are aligned to page boundaries (16KB for .so, 4B for others)."""
         zf = self.zip_file
         unaligned: List[Dict[str, Any]] = []
+        uncompressed_so_count = 0
         aligned_so_count = 0
         total_so_count = 0
 
@@ -316,6 +317,8 @@ class APK:
                 total_so_count += 1
 
             if info.compress_type == zipfile.ZIP_STORED:
+                if is_so:
+                    uncompressed_so_count += 1
                 target_align = so_alignment if is_so else file_alignment
                 fn_bytes = info.filename.encode("utf-8")
                 data_offset = info.header_offset + 30 + len(fn_bytes) + len(info.extra)
@@ -330,8 +333,8 @@ class APK:
                 elif is_so:
                     aligned_so_count += 1
 
-        is_16k_compliant = (total_so_count == 0) or (
-            aligned_so_count == total_so_count and not any(u["filename"].endswith(".so") for u in unaligned)
+        is_16k_compliant = (uncompressed_so_count == 0) or (
+            aligned_so_count == uncompressed_so_count and not any(u["filename"].endswith(".so") for u in unaligned)
         )
 
         return {
@@ -348,10 +351,60 @@ class APK:
         return bool(self.check_alignment(so_alignment=16384, file_alignment=4)["so_16k_compliant"])
 
     def verify(self) -> Dict[str, Any]:
-        """Validates internal CRC checksums, signature schemes, and 16KB/4B page alignment."""
+        """Validates internal CRC checksums, signature schemes, 16KB/4B page alignment, structural parse validity, and runtime readiness."""
         bad_file = self.zip_file.testzip()
         is_corrupt = bad_file is not None
         align_info = self.check_alignment()
+        fnames = set(self.filenames)
+
+        # Android native runtime checks (reject tiny <64B ELF header stubs)
+        valid_so_files = [
+            f for f in self.files
+            if f.filename.startswith("lib/") and f.filename.endswith(".so") and f.file_size >= 64
+        ]
+        has_native_runtime = len(valid_so_files) > 0
+        is_skeleton = bool(self.is_python_app and not has_native_runtime)
+
+        has_valid_arsc = False
+        if "resources.arsc" in fnames:
+            from pureapk.resources import ArscBuilder
+            try:
+                arsc_data = self.read("resources.arsc")
+                has_valid_arsc = ArscBuilder.is_valid_arsc(arsc_data)
+            except Exception:
+                has_valid_arsc = False
+        elif "AndroidManifest.xml" not in fnames:
+            has_valid_arsc = True
+
+        # Check DEX launcher activity presence across classes*.dex
+        launcher_activity_present = True
+        dex_files = sorted(n for n in fnames if "/" not in n and n.startswith("classes") and n.endswith(".dex"))
+        if self.activities and dex_files:
+            try:
+                from pureapk.dex import DexBuilder
+                dex_classes: Set[str] = set()
+                for df in dex_files:
+                    dex_classes.update(DexBuilder.extract_class_names(self.read(df)))
+                if dex_classes:
+                    launcher_activity_present = any(act in dex_classes for act in self.activities)
+            except Exception:
+                launcher_activity_present = False
+        elif self.activities and not dex_files:
+            launcher_activity_present = False
+
+        structural_parse_ready = bool(
+            not is_corrupt
+            and self.signature.is_signed
+            and has_valid_arsc
+            and launcher_activity_present
+        )
+
+        runnable_on_device = bool(
+            structural_parse_ready
+            and (has_native_runtime if self.is_python_app else True)
+            and not is_skeleton
+        )
+
         return {
             "is_valid": not is_corrupt,
             "corrupted_file": bad_file,
@@ -360,6 +413,13 @@ class APK:
             "is_aligned": align_info["is_aligned"],
             "so_16k_compliant": align_info["so_16k_compliant"],
             "unaligned_files": align_info["unaligned_files"],
+            "has_valid_arsc": has_valid_arsc,
+            "has_native_runtime": has_native_runtime,
+            "is_skeleton": is_skeleton,
+            "launcher_activity_present": launcher_activity_present,
+            "structural_parse_ready": structural_parse_ready,
+            "runnable_on_device": runnable_on_device,
+            "device_installable": structural_parse_ready,
         }
 
     def info(self) -> Dict[str, Any]:

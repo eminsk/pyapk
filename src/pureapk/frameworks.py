@@ -269,16 +269,25 @@ def _compile_py_bytecode(full_path: Path, filename: str, target_version: Optiona
 
 
 def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = False, channel: Optional[str] = None) -> None:
-
     """Packages framework project folders: lib/, res/, assets/, root DEX/resources, and private python tarballs."""
-
     # 1. Native shared libraries (lib/ -> lib/)
-
     lib_dir = src / "lib"
-
+    has_native_so = False
     if lib_dir.is_dir():
-
         builder.add_directory(lib_dir, prefix="lib", compress=True)
+        for _, _, files in os.walk(lib_dir):
+            if any(f.endswith(".so") for f in files):
+                has_native_so = True
+                break
+
+    if not has_native_so and not is_webview:
+        import sys
+        print(
+            "WARNING: Packaging skeleton APK without native Python runtime (0 .so files in lib/).\n"
+            "  This APK contains your Python code in assets/private.tar, but requires a native Python runtime to execute on device.\n"
+            "  To bundle native binaries, use 'pureapk unpack-wheel' or compile via 'pureapk init-ci --cython'.",
+            file=sys.stderr,
+        )
 
 
 
@@ -448,6 +457,10 @@ def _pack_framework_project(builder: APKBuilder, src: Path, is_webview: bool = F
     # "private_version" string resource differs from the on-device app/.version,
     # so a constant value makes app updates silently keep stale (or broken) files.
 
+    if arsc_bytes is None:
+        from pureapk.resources import ArscBuilder
+        arsc_bytes = ArscBuilder.generate_minimal_arsc()
+
     if arsc_bytes is not None:
 
         if private_tar_bytes:
@@ -479,77 +492,42 @@ class KivyAppHelper:
 
 
     @staticmethod
-
     def generate_manifest_xml(
-
         package_name: str,
-
         app_title: str,
-
         version_code: int = 1,
-
         version_name: str = "0.1",
-
         orientation: str = "portrait",
-
+        has_icon: bool = False,
     ) -> str:
-
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-
     package="{package_name}"
-
     android:versionCode="{version_code}"
-
     android:versionName="{version_name}">
 
-
-
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
-
     <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
 
-
-
     <application
-
-        android:label="{app_title}"
-
-        android:icon="@mipmap/ic_launcher"
-
+        android:label="{app_title}"{icon_attr}
         android:hardwareAccelerated="true">
-
         <activity
-
             android:name="org.kivy.android.PythonActivity"
-
             android:label="{app_title}"
-
             android:screenOrientation="{orientation}"
-
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
-
             android:exported="true">
-
             <intent-filter>
-
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
-
             </intent-filter>
-
         </activity>
-
     </application>
-
 </manifest>
-
 """
 
 
@@ -641,129 +619,85 @@ android.permissions = INTERNET
 
 
     @staticmethod
-
     def pack_app(
-
         source_dir: Union[str, Path],
-
         output_apk: Union[str, Path],
-
         package_name: Optional[str] = None,
-
         app_title: Optional[str] = None,
-
         release: bool = False,
-
         channel: Optional[str] = None,
-
         orientation: Optional[str] = None,
-
+        keystore: Optional[Union[str, Path]] = None,
+        password: str = "",
+        alias: Optional[str] = None,
     ) -> None:
-
         """Packs a Kivy project directory into a standard Android APK."""
-
         from pureapk.builder import APKBuilder
-
         from pureapk.stores import ReleaseHelper
 
         src = Path(source_dir)
 
-
-
         spec_file = src / "buildozer.spec"
-
         spec_title = None
-
         spec_pkg = None
-
         spec_orientation = "portrait"
-
         if spec_file.exists():
-
             try:
-
                 import configparser
-
                 cfg = configparser.ConfigParser()
-
                 cfg.read(str(spec_file), encoding="utf-8")
-
                 if "app" in cfg:
-
                     spec_title = cfg["app"].get("title")
-
                     p_name = cfg["app"].get("package.name")
-
                     p_dom = cfg["app"].get("package.domain")
-
                     if p_name and p_dom:
-
                         spec_pkg = f"{p_dom}.{p_name}"
-
                     elif p_name:
-
                         spec_pkg = p_name
-
                     spec_orientation = cfg["app"].get("orientation", "portrait")
-
             except Exception:
-
                 pass
 
-
-
         final_title = app_title or spec_title or "Kivy App"
-
         final_pkg = package_name or spec_pkg or "org.kivy.app"
-
         final_orient = orientation or spec_orientation or "portrait"
 
-
+        # Detect if project contains launcher icon resources
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
 
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
-
         if manifest_path.exists():
-
             builder.add_file(manifest_path, "AndroidManifest.xml")
-
         else:
-
             manifest_str = KivyAppHelper.generate_manifest_xml(
-
                 final_pkg,
-
                 final_title,
-
                 orientation=final_orient,
-
+                has_icon=has_icon,
             )
-
             if release:
-
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
-
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-
-
         _pack_framework_project(builder, src, channel=channel)
-
         builder.build()
 
 
@@ -781,77 +715,42 @@ class PygameAppHelper:
 
 
     @staticmethod
-
     def generate_manifest_xml(
-
         package_name: str,
-
         app_title: str,
-
         version_code: int = 1,
-
         version_name: str = "0.1",
-
         orientation: str = "landscape",
-
+        has_icon: bool = False,
     ) -> str:
-
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
-
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-
     package="{package_name}"
-
     android:versionCode="{version_code}"
-
     android:versionName="{version_name}">
 
-
-
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
-
     <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-permission android:name="android.permission.VIBRATE" />
-
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
 
-
-
     <application
-
-        android:label="{app_title}"
-
-        android:icon="@mipmap/ic_launcher"
-
+        android:label="{app_title}"{icon_attr}
         android:hardwareAccelerated="true">
-
         <activity
-
             android:name="org.renpy.android.PythonSDLActivity"
-
             android:label="{app_title}"
-
             android:screenOrientation="{orientation}"
-
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
-
             android:exported="true">
-
             <intent-filter>
-
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
-
             </intent-filter>
-
         </activity>
-
     </application>
-
 </manifest>
-
 """
 
 
@@ -961,129 +860,84 @@ android.permissions = INTERNET,VIBRATE
 
 
     @staticmethod
-
     def pack_app(
-
         source_dir: Union[str, Path],
-
         output_apk: Union[str, Path],
-
         package_name: Optional[str] = None,
-
         app_title: Optional[str] = None,
-
         release: bool = False,
-
         channel: Optional[str] = None,
-
         orientation: Optional[str] = None,
-
+        keystore: Optional[Union[str, Path]] = None,
+        password: str = "",
+        alias: Optional[str] = None,
     ) -> None:
-
         """Packs a Pygame project directory into a standard Android APK."""
-
         from pureapk.builder import APKBuilder
-
         from pureapk.stores import ReleaseHelper
 
         src = Path(source_dir)
 
-
-
         spec_file = src / "buildozer.spec"
-
         spec_title = None
-
         spec_pkg = None
-
         spec_orientation = "landscape"
-
         if spec_file.exists():
-
             try:
-
                 import configparser
-
                 cfg = configparser.ConfigParser()
-
                 cfg.read(str(spec_file), encoding="utf-8")
-
                 if "app" in cfg:
-
                     spec_title = cfg["app"].get("title")
-
                     p_name = cfg["app"].get("package.name")
-
                     p_dom = cfg["app"].get("package.domain")
-
                     if p_name and p_dom:
-
                         spec_pkg = f"{p_dom}.{p_name}"
-
                     elif p_name:
-
                         spec_pkg = p_name
-
                     spec_orientation = cfg["app"].get("orientation", "landscape")
-
             except Exception:
-
                 pass
 
-
-
         final_title = app_title or spec_title or "Pygame App"
-
         final_pkg = package_name or spec_pkg or "org.pygame.app"
-
         final_orient = orientation or spec_orientation or "landscape"
 
-
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
 
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
-
         if manifest_path.exists():
-
             builder.add_file(manifest_path, "AndroidManifest.xml")
-
         else:
-
             manifest_str = PygameAppHelper.generate_manifest_xml(
-
                 final_pkg,
-
                 final_title,
-
                 orientation=final_orient,
-
+                has_icon=has_icon,
             )
-
             if release:
-
                 manifest_str = ReleaseHelper.sanitize_manifest_for_release(manifest_str)
-
             builder.add_bytes("AndroidManifest.xml", manifest_str.encode("utf-8"))
 
-
-
         _pack_framework_project(builder, src, channel=channel)
-
         builder.build()
 
 
@@ -1113,9 +967,10 @@ class FletAppHelper:
         version_name: str = "0.1",
 
         orientation: str = "sensor",
-
+        has_icon: bool = False,
     ) -> str:
 
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1138,7 +993,7 @@ class FletAppHelper:
 
         android:label="{app_title}"
 
-        android:icon="@mipmap/ic_launcher"
+        {icon_attr}
 
         android:hardwareAccelerated="true">
 
@@ -1259,8 +1114,7 @@ class FletAppHelper:
         release: bool = False,
 
         channel: Optional[str] = None,
-
-    ) -> None:
+        keystore: Optional[Union[str, Path]] = None, password: str = "", alias: Optional[str] = None) -> None:
 
         from pureapk.builder import APKBuilder
 
@@ -1268,20 +1122,24 @@ class FletAppHelper:
 
         src = Path(source_dir)
 
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
+
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
@@ -1292,7 +1150,7 @@ class FletAppHelper:
 
         else:
 
-            manifest_str = FletAppHelper.generate_manifest_xml(package_name or "com.flet.app", app_title)
+            manifest_str = FletAppHelper.generate_manifest_xml(package_name or "com.flet.app", app_title, has_icon=has_icon)
 
             if release:
 
@@ -1333,9 +1191,10 @@ class TogaAppHelper:
         version_name: str = "0.1",
 
         orientation: str = "portrait",
-
+        has_icon: bool = False,
     ) -> str:
 
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1358,7 +1217,7 @@ class TogaAppHelper:
 
         android:label="{app_title}"
 
-        android:icon="@mipmap/ic_launcher">
+        {icon_attr}>
 
         <activity
 
@@ -1451,8 +1310,7 @@ class TogaAppHelper:
         release: bool = False,
 
         channel: Optional[str] = None,
-
-    ) -> None:
+        keystore: Optional[Union[str, Path]] = None, password: str = "", alias: Optional[str] = None) -> None:
 
         from pureapk.builder import APKBuilder
 
@@ -1460,20 +1318,24 @@ class TogaAppHelper:
 
         src = Path(source_dir)
 
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
+
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
@@ -1484,7 +1346,7 @@ class TogaAppHelper:
 
         else:
 
-            manifest_str = TogaAppHelper.generate_manifest_xml(package_name or "org.beeware.app", app_title)
+            manifest_str = TogaAppHelper.generate_manifest_xml(package_name or "org.beeware.app", app_title, has_icon=has_icon)
 
             if release:
 
@@ -1525,9 +1387,10 @@ class RenPyAppHelper:
         version_name: str = "0.1",
 
         orientation: str = "landscape",
-
+        has_icon: bool = False,
     ) -> str:
 
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1552,7 +1415,7 @@ class RenPyAppHelper:
 
         android:label="{app_title}"
 
-        android:icon="@mipmap/ic_launcher"
+        {icon_attr}
 
         android:hardwareAccelerated="true">
 
@@ -1633,8 +1496,7 @@ class RenPyAppHelper:
         release: bool = False,
 
         channel: Optional[str] = None,
-
-    ) -> None:
+        keystore: Optional[Union[str, Path]] = None, password: str = "", alias: Optional[str] = None) -> None:
 
         from pureapk.builder import APKBuilder
 
@@ -1642,20 +1504,24 @@ class RenPyAppHelper:
 
         src = Path(source_dir)
 
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
+
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
@@ -1666,7 +1532,7 @@ class RenPyAppHelper:
 
         else:
 
-            manifest_str = RenPyAppHelper.generate_manifest_xml(package_name or "org.renpy.game", app_title)
+            manifest_str = RenPyAppHelper.generate_manifest_xml(package_name or "org.renpy.game", app_title, has_icon=has_icon)
 
             if release:
 
@@ -1707,9 +1573,10 @@ class WebViewAppHelper:
         version_name: str = "0.1",
 
         orientation: str = "sensor",
-
+        has_icon: bool = False,
     ) -> str:
 
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1732,7 +1599,7 @@ class WebViewAppHelper:
 
         android:label="{app_title}"
 
-        android:icon="@mipmap/ic_launcher"
+        {icon_attr}
 
         android:hardwareAccelerated="true">
 
@@ -1849,8 +1716,7 @@ class WebViewAppHelper:
         release: bool = False,
 
         channel: Optional[str] = None,
-
-    ) -> None:
+        keystore: Optional[Union[str, Path]] = None, password: str = "", alias: Optional[str] = None) -> None:
 
         from pureapk.builder import APKBuilder
 
@@ -1858,20 +1724,24 @@ class WebViewAppHelper:
 
         src = Path(source_dir)
 
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
+
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
@@ -1882,7 +1752,7 @@ class WebViewAppHelper:
 
         else:
 
-            manifest_str = WebViewAppHelper.generate_manifest_xml(package_name or "com.webview.app", app_title)
+            manifest_str = WebViewAppHelper.generate_manifest_xml(package_name or "com.webview.app", app_title, has_icon=has_icon)
 
             if release:
 
@@ -1923,9 +1793,10 @@ class PySideAppHelper:
         version_name: str = "0.1",
 
         orientation: str = "unspecified",
-
+        has_icon: bool = False,
     ) -> str:
 
+        icon_attr = '\n        android:icon="@mipmap/ic_launcher"' if has_icon else ""
         return f"""<?xml version="1.0" encoding="utf-8"?>
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
@@ -1950,7 +1821,7 @@ class PySideAppHelper:
 
         android:label="{app_title}"
 
-        android:icon="@mipmap/ic_launcher"
+        {icon_attr}
 
         android:hardwareAccelerated="true">
 
@@ -2053,8 +1924,7 @@ class PySideAppHelper:
         release: bool = False,
 
         channel: Optional[str] = None,
-
-    ) -> None:
+        keystore: Optional[Union[str, Path]] = None, password: str = "", alias: Optional[str] = None) -> None:
 
         from pureapk.builder import APKBuilder
 
@@ -2062,20 +1932,24 @@ class PySideAppHelper:
 
         src = Path(source_dir)
 
+        has_icon = False
+        res_dir = src / "res"
+        if res_dir.is_dir():
+            for _, _, files in os.walk(res_dir):
+                if any(f.startswith("ic_launcher") or f.endswith((".png", ".webp")) for f in files):
+                    has_icon = True
+                    break
+
         builder = APKBuilder(
-
             output_apk,
-
             auto_axml=True,
-
             auto_dex=True,
-
             auto_resources=True,
-
             sign=True,
-
             compile_py=True,
-
+            keystore_path=keystore,
+            keystore_password=password,
+            key_alias=alias or ("release" if (release or keystore) else "androiddebugkey"),
         )
 
         manifest_path = src / "AndroidManifest.xml"
@@ -2086,7 +1960,7 @@ class PySideAppHelper:
 
         else:
 
-            manifest_str = PySideAppHelper.generate_manifest_xml(package_name or "org.qtproject.example", app_title)
+            manifest_str = PySideAppHelper.generate_manifest_xml(package_name or "org.qtproject.example", app_title, has_icon=has_icon)
 
             if release:
 

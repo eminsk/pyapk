@@ -24,7 +24,8 @@ from pureapk.frameworks import (
     WebViewAppHelper,
 )
 from pureapk.manifest import AndroidManifest, AxmlAttribute, AxmlElement, AxmlEncoder
-from pureapk.signature import APKCertificate, APKSigner, APKSignature
+from pureapk.resources import ArscBuilder
+from pureapk.signature import APKCertificate, APKSigner, APKSignature, IPASigner
 from pureapk.stores import (
     AABBuilder,
     AppleAppHelper,
@@ -49,6 +50,7 @@ __all__ = [
     "DexHeader",
     "MultiDexSummary",
     "DexBuilder",
+    "ArscBuilder",
     "AndroidManifest",
     "AxmlElement",
     "AxmlAttribute",
@@ -56,6 +58,7 @@ __all__ = [
     "APKSignature",
     "APKCertificate",
     "APKSigner",
+    "IPASigner",
     "FrameworkDetector",
     "KivyAppHelper",
     "PygameAppHelper",

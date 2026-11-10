@@ -55,13 +55,40 @@ def test_multidex_summary(sample_dex_bytes: bytes) -> None:
 
 
 def test_dex_builder_bootstrap() -> None:
+    # 1. Real valid Dalvik DEX generation with bytecode
     dex_bytes = DexBuilder.generate_bootstrap_dex(classes_count=5, methods_count=10)
-    assert len(dex_bytes) == 112
+    assert len(dex_bytes) > 112
     assert dex_bytes.startswith(b"dex\n035\x00")
 
     header = DexHeader.from_bytes(dex_bytes)
     assert header.is_valid is True
     assert header.version == "035"
     assert header.class_defs_size == 5
-    assert header.method_ids_size == 10
+    assert header.file_size == len(dex_bytes)
+
+    # Verify extracted classes
+    classes = DexBuilder.extract_class_names(dex_bytes)
+    assert len(classes) == 5
+    assert "MainActivity0" in classes
+
+    # Default launcher bootstrap classes
+    default_dex = DexBuilder.generate_bootstrap_dex()
+    default_hdr = DexHeader.from_bytes(default_dex)
+    assert default_hdr.is_valid is True
+    default_classes = DexBuilder.extract_class_names(default_dex)
+    assert "org.kivy.android.PythonActivity" in default_classes
+    assert "org.renpy.android.PythonSDLActivity" in default_classes
+    assert "io.flet.FletActivity" in default_classes
+    assert "org.beeware.android.MainActivity" in default_classes
+    assert "com.webview.app.MainActivity" in default_classes
+    assert "org.qtproject.qt.android.bindings.QtActivity" in default_classes
+
+    # 2. Raw stub generation (when explicitly requested)
+    stub_bytes = DexBuilder.generate_bootstrap_dex(classes_count=5, methods_count=10, raw_stub=True)
+    assert len(stub_bytes) == 112
+    assert stub_bytes.startswith(b"dex\n035\x00")
+    stub_hdr = DexHeader.from_bytes(stub_bytes)
+    assert stub_hdr.is_valid is True
+    assert stub_hdr.class_defs_size == 5
+    assert stub_hdr.method_ids_size == 10
 

@@ -61,6 +61,9 @@ class APKBuilder:
         "_compile_py",
         "_alignment",
         "_so_alignment",
+        "_keystore_path",
+        "_keystore_password",
+        "_key_alias",
     )
 
     def __init__(
@@ -74,6 +77,9 @@ class APKBuilder:
         compile_py: bool = False,
         alignment: int = 4,
         so_alignment: int = 16384,
+        keystore_path: Optional[Union[str, Path]] = None,
+        keystore_password: str = "",
+        key_alias: str = "release",
     ) -> None:
         self._output_path = output_path
         self._entries: List[Tuple[str, bytes, int]] = []
@@ -85,6 +91,9 @@ class APKBuilder:
         self._compile_py = compile_py
         self._alignment = alignment
         self._so_alignment = so_alignment
+        self._keystore_path = keystore_path
+        self._keystore_password = keystore_password
+        self._key_alias = key_alias
 
     def add_bytes(self, archive_name: str, data: bytes, compress: Optional[bool] = None) -> APKBuilder:
         norm_name = archive_name.replace("\\", "/").lstrip("/")
@@ -152,9 +161,10 @@ class APKBuilder:
             dex_bytes = DexBuilder.generate_bootstrap_dex()
             self._entries.append(("classes.dex", dex_bytes, zipfile.ZIP_DEFLATED))
 
-        # Auto-inject resources.arsc table if missing
+        # Auto-inject valid resources.arsc table if missing
         if self._auto_resources and "resources.arsc" not in existing_names:
-            arsc_bytes = struct.pack("<HHII", 0x0002, 12, 12, 0)
+            from pureapk.resources import ArscBuilder
+            arsc_bytes = ArscBuilder.generate_minimal_arsc()
             self._entries.append(("resources.arsc", arsc_bytes, zipfile.ZIP_STORED))
 
         buf = io.BytesIO() if self._sign else self._output_path
@@ -173,8 +183,11 @@ class APKBuilder:
             unsigned_apk = buf.getvalue()
             signed_apk = APKSigner.sign_apk_bytes(
                 unsigned_apk,
+                key_alias=self._key_alias,
                 alignment=self._alignment,
                 so_alignment=self._so_alignment,
+                keystore_path=self._keystore_path,
+                keystore_password=self._keystore_password,
             )
             if isinstance(self._output_path, (str, Path)):
                 Path(self._output_path).write_bytes(signed_apk)
@@ -192,6 +205,9 @@ def pack(
     compile_py: bool = False,
     alignment: int = 4,
     so_alignment: int = 16384,
+    keystore_path: Optional[Union[str, Path]] = None,
+    keystore_password: str = "",
+    key_alias: str = "release",
 ) -> None:
     """Convenience helper to pack a directory into an APK."""
     builder = APKBuilder(
@@ -203,6 +219,9 @@ def pack(
         compile_py=compile_py,
         alignment=alignment,
         so_alignment=so_alignment,
+        keystore_path=keystore_path,
+        keystore_password=keystore_password,
+        key_alias=key_alias,
     )
     builder.add_directory(source_dir)
     builder.build()

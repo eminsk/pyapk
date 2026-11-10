@@ -31,10 +31,37 @@ SIGNATURE_SCHEME_V4_BLOCK_ID = 0x2B09871A
 _STRUCT_SIG_PAIR_HEADER = struct.Struct("<QI")
 
 
+def _extract_x509_from_pkcs7(raw_bytes: bytes) -> bytes:
+    """Extracts the embedded X.509 DER certificate from a PKCS#7 SignedData container if present."""
+    if len(raw_bytes) < 32 or raw_bytes[0] != 0x30:
+        return raw_bytes
+    # Locate [0] IMPLICIT Certificates tag (0xA0) inside SignedData
+    idx = 0
+    while True:
+        pos = raw_bytes.find(b"\xa0", idx)
+        if pos == -1 or pos + 4 >= len(raw_bytes):
+            break
+        # Check if immediately followed by a SEQUENCE (0x30) of length >= 128 (0x82 ...)
+        l1 = raw_bytes[pos + 1]
+        hdr_skip = 2 + (l1 & 0x7F) if (l1 & 0x80) else 2
+        cert_start = pos + hdr_skip
+        if cert_start + 4 < len(raw_bytes) and raw_bytes[cert_start] == 0x30 and (raw_bytes[cert_start + 1] & 0x80):
+            c_nb = raw_bytes[cert_start + 1] & 0x7F
+            if 1 <= c_nb <= 3 and cert_start + 2 + c_nb <= len(raw_bytes):
+                c_len = int.from_bytes(raw_bytes[cert_start + 2 : cert_start + 2 + c_nb], "big")
+                cert_end = cert_start + 2 + c_nb + c_len
+                if c_len >= 128 and cert_end <= len(raw_bytes):
+                    # Verify inner TBSCertificate starts with SEQUENCE (0x30)
+                    if raw_bytes[cert_start + 2 + c_nb] == 0x30:
+                        return raw_bytes[cert_start:cert_end]
+        idx = pos + 1
+    return raw_bytes
+
+
 class APKCertificate:
     """Certificate container with pre-computed cryptographic fingerprints."""
 
-    __slots__ = ("filename", "raw_bytes", "sha256", "sha1", "md5")
+    __slots__ = ("filename", "raw_bytes", "sha256", "sha1", "md5", "cert_der", "cert_sha256", "cert_sha1")
 
     def __init__(self, filename: str, raw_bytes: bytes) -> None:
         self.filename = filename
@@ -42,6 +69,9 @@ class APKCertificate:
         self.sha256 = hashlib.sha256(raw_bytes).hexdigest()
         self.sha1 = hashlib.sha1(raw_bytes).hexdigest()
         self.md5 = hashlib.md5(raw_bytes).hexdigest()
+        self.cert_der = _extract_x509_from_pkcs7(raw_bytes)
+        self.cert_sha256 = hashlib.sha256(self.cert_der).hexdigest().upper()
+        self.cert_sha1 = hashlib.sha1(self.cert_der).hexdigest().upper()
 
     def as_dict(self) -> Dict[str, str]:
         return {
@@ -49,6 +79,8 @@ class APKCertificate:
             "sha256": self.sha256,
             "sha1": self.sha1,
             "md5": self.md5,
+            "cert_sha256": self.cert_sha256,
+            "cert_sha1": self.cert_sha1,
         }
 
 
@@ -239,44 +271,189 @@ def _len_prefixed(data: bytes) -> bytes:
 
 def _rsa_sign_sha256(data: bytes, n: int, d: int) -> bytes:
     """Computes an RSA PKCS#1 v1.5 signature with SHA-256 in pure Python."""
+    key_byte_len = (n.bit_length() + 7) // 8
     h = hashlib.sha256(data).digest()
     digest_info = (
         b"\x30\x31\x30\x0d\x06\x09\x60\x86\x48\x01\x65\x03\x04\x02\x01\x05\x00\x04\x20"
         + h
     )
-    pad_len = 256 - 3 - len(digest_info)
+    pad_len = key_byte_len - 3 - len(digest_info)
     padded = b"\x00\x01" + (b"\xff" * pad_len) + b"\x00" + digest_info
     sig_int = pow(int.from_bytes(padded, "big"), d, n)
-    return sig_int.to_bytes(256, "big")
+    return sig_int.to_bytes(key_byte_len, "big")
+
+
+_SMALL_PRIMES: Tuple[int, ...] = tuple(
+    p for p in range(3, 2000, 2) if all(p % d != 0 for d in range(3, int(p**0.5) + 1, 2))
+)
+
+
+def _is_probable_prime(n: int) -> bool:
+    """Miller-Rabin primality test with small-prime trial division."""
+    for p in _SMALL_PRIMES:
+        if n % p == 0:
+            return n == p
+    d = n - 1
+    r = (d & -d).bit_length() - 1
+    d >>= r
+    for a in (2, 3, 5, 7, 11, 13, 17, 19):
+        x = pow(a, d, n)
+        if x == 1 or x == n - 1:
+            continue
+        for _ in range(r - 1):
+            x = pow(x, 2, n)
+            if x == n - 1:
+                break
+        else:
+            return False
+    return True
+
+
+def _generate_prime(bits: int) -> int:
+    """Generates a random probable prime of exact bit length."""
+    import os
+
+    byte_len = bits // 8
+    top_mask = (1 << (bits - 1)) | (1 << (bits - 2))
+    while True:
+        cand = int.from_bytes(os.urandom(byte_len), "big")
+        cand |= top_mask | 1
+        cand &= (1 << bits) - 1
+        if _is_probable_prime(cand):
+            return cand
+
+
+def generate_rsa_keypair(bits: int = 2048) -> Tuple[int, int, int]:
+    """Generates a fresh RSA keypair (n, e, d) in 100% pure Python."""
+    e = 65537
+    half = bits // 2
+    while True:
+        p = _generate_prime(half)
+        q = _generate_prime(bits - half)
+        if p == q:
+            continue
+        phi = (p - 1) * (q - 1)
+        if phi % e != 0:
+            n = p * q
+            d = pow(e, -1, phi)
+            return n, e, d
+
+
+def build_rsa_pubkey_der(n: int, e: int = 65537) -> bytes:
+    """Builds ASN.1 DER SubjectPublicKeyInfo for an RSA public key."""
+    rsa_pubkey_seq = _asn1_tag(0x30, _asn1_int(n) + _asn1_int(e))
+    rsa_alg_id = bytes.fromhex("300d06092a864886f70d0101010500")
+    return _asn1_tag(0x30, rsa_alg_id + _asn1_tag(0x03, b"\x00" + rsa_pubkey_seq))
+
+
+def build_self_signed_cert_der(
+    n: int,
+    d: int,
+    e: int = 65537,
+    common_name: str = "Release",
+    organization: str = "PureAPK",
+    country: str = "US",
+    validity_days: int = 10000,
+) -> Tuple[bytes, bytes]:
+    """Builds a valid self-signed X.509v3 certificate DER and SubjectPublicKeyInfo DER in pure Python."""
+    import datetime
+    import os
+
+    pubkey_der = build_rsa_pubkey_der(n, e)
+    version_v3 = _asn1_tag(0xA0, _asn1_int(2))
+    serial_int = (int.from_bytes(os.urandom(16), "big") & ((1 << 127) - 1)) or 1
+    serial_der = _asn1_int(serial_int)
+    sha256_rsa_alg = bytes.fromhex("300d06092a864886f70d01010b0500")
+
+    def _rdn_attr(oid_hex: str, val_str: str) -> bytes:
+        oid = _asn1_tag(0x06, bytes.fromhex(oid_hex))
+        utf8_val = _asn1_tag(0x0C, val_str.encode("utf-8"))
+        return _asn1_tag(0x31, _asn1_tag(0x30, oid + utf8_val))
+
+    name_der = _asn1_tag(
+        0x30,
+        _rdn_attr("550406", (country or "US")[:2].upper())
+        + _rdn_attr("55040a", organization or "PureAPK")
+        + _rdn_attr("550403", common_name or "Release"),
+    )
+
+    now = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=5)
+    end = now + datetime.timedelta(days=max(1, validity_days))
+    t1 = _asn1_tag(0x17, now.strftime("%y%m%d%H%M%SZ").encode("ascii"))
+    if end.year >= 2050:
+        t2 = _asn1_tag(0x18, end.strftime("%Y%m%d%H%M%SZ").encode("ascii"))
+    else:
+        t2 = _asn1_tag(0x17, end.strftime("%y%m%d%H%M%SZ").encode("ascii"))
+    validity_der = _asn1_tag(0x30, t1 + t2)
+
+    tbs_cert = _asn1_tag(
+        0x30,
+        version_v3 + serial_der + sha256_rsa_alg + name_der + validity_der + name_der + pubkey_der,
+    )
+    cert_sig = _rsa_sign_sha256(tbs_cert, n, d)
+    cert_der = _asn1_tag(0x30, tbs_cert + sha256_rsa_alg + _asn1_tag(0x03, b"\x00" + cert_sig))
+    return cert_der, pubkey_der
+
+
+def _asn1_read_node(data: bytes, offset: int) -> Tuple[int, int, int]:
+    """Reads an ASN.1 TLV header at ``offset`` and returns (tag, value_start, value_end)."""
+    tag = data[offset]
+    b1 = data[offset + 1]
+    if b1 & 0x80:
+        nb = b1 & 0x7F
+        length = int.from_bytes(data[offset + 2 : offset + 2 + nb], "big")
+        val_start = offset + 2 + nb
+    else:
+        length = b1
+        val_start = offset + 2
+    return tag, val_start, val_start + length
+
+
+def parse_pkcs1_or_pkcs8_rsa_key_der(key_der: bytes) -> Tuple[int, int, int]:
+    """Parses a DER-encoded PKCS#1 RSAPrivateKey or PKCS#8 PrivateKeyInfo into (n, e, d)."""
+    tag, vs, ve = _asn1_read_node(key_der, 0)
+    if tag != 0x30:
+        raise ValueError("Invalid RSA private key DER: root is not a SEQUENCE")
+
+    # Collect top-level children inside SEQUENCE
+    pos = vs
+    children: List[Tuple[int, bytes]] = []
+    while pos < ve:
+        ctag, cvs, cve = _asn1_read_node(key_der, pos)
+        children.append((ctag, key_der[cvs:cve]))
+        pos = cve
+
+    # Case 1: PKCS#8 PrivateKeyInfo -> [version(INT), algId(SEQ), privateKey(OCTET STRING)]
+    if len(children) >= 3 and children[0][0] == 0x02 and children[1][0] == 0x30 and children[2][0] == 0x04:
+        return parse_pkcs1_or_pkcs8_rsa_key_der(children[2][1])
+
+    # Case 2: PKCS#1 RSAPrivateKey -> [version, n, e, d, p, q, ...]
+    ints = [int.from_bytes(val, "big") for ctag, val in children if ctag == 0x02]
+    if len(ints) < 4:
+        raise ValueError("Invalid RSAPrivateKey DER: fewer than 4 INTEGER components")
+    n, e, d = ints[1], ints[2], ints[3]
+    return n, e, d
 
 
 def _build_pkcs7_der(sf_data: bytes, cert_der: bytes, n: int, d: int) -> bytes:
     """Builds a standard, RFC 2315 compliant detached PKCS#7 SignedData structure."""
-    # Extract issuer and serialNumber from certificate DER
-    tbs_pos = 2 + (cert_der[1] & 0x7F if cert_der[1] & 0x80 else 0)
-    inner_pos = tbs_pos + 2 + (cert_der[tbs_pos + 1] & 0x7F if cert_der[tbs_pos + 1] & 0x80 else 0)
-    # Skip version [0]
-    inner_pos += 2 + cert_der[inner_pos + 1]
-    # Extract serialNumber
-    s_len = cert_der[inner_pos + 1]
-    serial_bytes = cert_der[inner_pos:inner_pos + 2 + s_len]
-    inner_pos += 2 + s_len
-    # Skip sigAlg
-    sig_len = cert_der[inner_pos + 1]
-    if sig_len & 0x80:
-        nb = sig_len & 0x7F
-        sig_len = int.from_bytes(cert_der[inner_pos + 2:inner_pos + 2 + nb], "big")
-        inner_pos += 2 + nb + sig_len
-    else:
-        inner_pos += 2 + sig_len
-    # Extract issuer
-    iss_len = cert_der[inner_pos + 1]
-    if iss_len & 0x80:
-        nb = iss_len & 0x7F
-        iss_len = int.from_bytes(cert_der[inner_pos + 2:inner_pos + 2 + nb], "big")
-        issuer_bytes = cert_der[inner_pos:inner_pos + 2 + nb + iss_len]
-    else:
-        issuer_bytes = cert_der[inner_pos:inner_pos + 2 + iss_len]
+    # Extract issuer and serialNumber from certificate DER using ASN.1 TLV reader
+    _, cert_vs, _ = _asn1_read_node(cert_der, 0)
+    _, tbs_vs, tbs_ve = _asn1_read_node(cert_der, cert_vs)
+
+    pos = tbs_vs
+    tbs_nodes: List[Tuple[int, int, int]] = []
+    while pos < tbs_ve and len(tbs_nodes) < 5:
+        ctag, cvs, cve = _asn1_read_node(cert_der, pos)
+        tbs_nodes.append((ctag, pos, cve))
+        pos = cve
+
+    has_explicit_ver = bool(tbs_nodes and tbs_nodes[0][0] == 0xA0)
+    serial_idx = 1 if has_explicit_ver else 0
+    issuer_idx = 3 if has_explicit_ver else 2
+
+    serial_bytes = cert_der[tbs_nodes[serial_idx][1] : tbs_nodes[serial_idx][2]]
+    issuer_bytes = cert_der[tbs_nodes[issuer_idx][1] : tbs_nodes[issuer_idx][2]]
 
     sig_bytes = _rsa_sign_sha256(sf_data, n, d)
     issuer_and_serial = _asn1_tag(0x30, issuer_bytes + serial_bytes)
@@ -318,6 +495,7 @@ class APKSigner:
         keystore_path: Optional[Union[str, Path]] = None,
         keystore_password: str = "",
     ) -> bytes:
+        """Signs APK in-memory with v1 and v2 signature schemes, ensuring uncompressed entries remain 4B/16KB aligned."""
         use_debug = (key_alias in ("debug", "androiddebugkey")) and not keystore_path
         active_cert = _DEBUG_CERT_DER if use_debug else _RELEASE_CERT_DER
         active_pubkey = _DEBUG_PUBKEY_DER if use_debug else _RELEASE_PUBKEY_DER
@@ -326,12 +504,15 @@ class APKSigner:
 
         if keystore_path:
             from pureapk.stores import ReleaseHelper
-            ReleaseHelper.load_release_keystore(keystore_path, store_pass=keystore_password, key_alias=key_alias)
-            active_cert = _RELEASE_CERT_DER
-            active_pubkey = _RELEASE_PUBKEY_DER
-            active_n = _RELEASE_RSA_N
-            active_d = _RELEASE_RSA_D
-        """Signs APK in-memory with v1 and v2 signature schemes, ensuring uncompressed entries remain 4B/16KB aligned."""
+            ks_profile = ReleaseHelper.load_release_keystore(
+                keystore_path,
+                store_pass=keystore_password,
+                key_alias=key_alias,
+            )
+            active_cert = ks_profile["cert_der"]
+            active_pubkey = ks_profile["pubkey_der"]
+            active_n = ks_profile["rsa_n"]
+            active_d = ks_profile["rsa_d"]
         import io
         from pureapk.builder import align_zip_entry
 

@@ -35,9 +35,8 @@ from typing import (
     Sequence,
 
     Set,
-
     Tuple,
-
+    Union,
 )
 
 import xml.etree.ElementTree as ET
@@ -994,303 +993,334 @@ class AndroidManifest:
 
 ANDROID_NS: str = "http://schemas.android.com/apk/res/android"
 
-
-
+# Official Android system attribute resource IDs (android.R.attr.*)
+ANDROID_ATTR_RESOURCE_IDS: Dict[str, int] = {
+    "theme": 0x01010000,
+    "label": 0x01010001,
+    "icon": 0x01010002,
+    "name": 0x01010003,
+    "permission": 0x01010006,
+    "readPermission": 0x01010007,
+    "writePermission": 0x01010008,
+    "protectionLevel": 0x01010009,
+    "permissionGroup": 0x0101000A,
+    "sharedUserId": 0x0101000B,
+    "hasCode": 0x0101000C,
+    "persistent": 0x0101000D,
+    "enabled": 0x0101000E,
+    "debuggable": 0x0101000F,
+    "exported": 0x01010010,
+    "process": 0x01010011,
+    "taskAffinity": 0x01010012,
+    "multiprocess": 0x01010013,
+    "finishOnTaskLaunch": 0x01010014,
+    "clearTaskOnLaunch": 0x01010015,
+    "stateNotNeeded": 0x01010016,
+    "excludeFromRecents": 0x01010017,
+    "authorities": 0x01010018,
+    "syncable": 0x01010019,
+    "initOrder": 0x0101001A,
+    "grantUriPermissions": 0x0101001B,
+    "priority": 0x0101001C,
+    "launchMode": 0x0101001D,
+    "screenOrientation": 0x0101001E,
+    "configChanges": 0x0101001F,
+    "description": 0x01010020,
+    "targetPackage": 0x01010021,
+    "handleProfiling": 0x01010022,
+    "functionalTest": 0x01010023,
+    "value": 0x01010024,
+    "resource": 0x01010025,
+    "mimeType": 0x01010026,
+    "scheme": 0x01010027,
+    "host": 0x01010028,
+    "port": 0x01010029,
+    "path": 0x0101002A,
+    "pathPrefix": 0x0101002B,
+    "pathPattern": 0x0101002C,
+    "action": 0x0101002D,
+    "data": 0x0101002E,
+    "targetClass": 0x0101002F,
+    "windowSoftInputMode": 0x0101022B,
+    "minSdkVersion": 0x0101020C,
+    "versionCode": 0x0101021B,
+    "versionName": 0x0101021C,
+    "anyDensity": 0x0101026C,
+    "targetSdkVersion": 0x01010270,
+    "allowBackup": 0x01010280,
+    "glEsVersion": 0x01010281,
+    "smallScreens": 0x01010284,
+    "normalScreens": 0x01010285,
+    "largeScreens": 0x01010286,
+    "required": 0x0101028E,
+    "installLocation": 0x010102B7,
+    "xlargeScreens": 0x010102BF,
+    "hardwareAccelerated": 0x010102D3,
+    "supportsRtl": 0x010103AF,
+    "roundIcon": 0x0101052C,
+    "extractNativeLibs": 0x010104EA,
+    "usesCleartextTraffic": 0x010104EC,
+    "maxSdkVersion": 0x01010271,
+    "compileSdkVersion": 0x01010572,
+    "compileSdkVersionCodename": 0x01010573,
+}
 
 
 class AxmlEncoder:
-
     """High-performance Android Binary XML (AXML) encoder.
 
-
-
     Translates standard XML text into Android Binary XML (AXML)
-
-    compatible with Android OS AssetManager and ResourceTypes.
-
+    with full RES_XML_RESOURCE_MAP_TYPE (0x0180) table compatible with
+    Android OS PackageParser, AssetManager, and ResourceTypes.
     """
-
-
 
     __slots__ = ()
 
-
-
     @classmethod
-
     def encode(cls, xml_content: Union[str, bytes]) -> bytes:
-
         xml_str = {
-
             True: lambda: xml_content.decode("utf-8", errors="replace"),
-
             False: lambda: xml_content,
-
         }[isinstance(xml_content, bytes)]()
 
-
-
         root = ET.fromstring(xml_str)
-
         strings: List[str] = []
 
-
-
         def add_str(s: str) -> int:
-
             has_str = s in strings
-
             action = {
-
                 True: lambda: strings.index(s),
-
                 False: lambda: (strings.append(s), len(strings) - 1)[1],
-
             }[has_str]
-
             return action()
 
+        # 1. Collect all android:* attribute names first and sort by 0x0101xxxx resource ID
+        # so they sit at indices 0..K-1 of the string pool for CHUNK_RESOURCE_MAP (0x0180)
+        NON_ANDROID_ATTRS = ("package", "split", "coreApp", "platformBuildVersionCode", "platformBuildVersionName")
+        mapped_attrs: Dict[str, int] = {}
+        for elem in root.iter():
+            for k in elem.attrib.keys():
+                attr_name = k.split("}")[-1].split(":")[-1]
+                is_android = (
+                    k.startswith(f"{{{ANDROID_NS}}}")
+                    or k.startswith("android:")
+                    or (attr_name not in NON_ANDROID_ATTRS and not k.startswith("xmlns"))
+                )
+                if is_android and attr_name in ANDROID_ATTR_RESOURCE_IDS:
+                    mapped_attrs[attr_name] = ANDROID_ATTR_RESOURCE_IDS[attr_name]
 
+        sorted_mapped = sorted(mapped_attrs.items(), key=lambda item: item[1])
+        resource_ids: List[int] = []
+        for attr_name, res_id in sorted_mapped:
+            add_str(attr_name)
+            resource_ids.append(res_id)
 
-        # Seed namespace strings
-
+        # 2. Seed namespace strings and remaining element/attribute strings
         ns_prefix_idx = add_str("android")
-
         ns_uri_idx = add_str(ANDROID_NS)
 
-
-
-        # Collect strings across entire tree
-
         for elem in root.iter():
-
             tag = elem.tag.split("}")[-1]
-
             add_str(tag)
-
             for k, v in elem.attrib.items():
-
-                attr_name = k.split("}")[-1]
-
+                attr_name = k.split("}")[-1].split(":")[-1]
                 add_str(attr_name)
-
                 add_str(v)
 
-
-
-        # Build string pool
-
+        # 3. Build UTF-16LE string pool (0x0001)
         str_offsets: List[int] = []
-
         str_data = bytearray()
-
         for s in strings:
-
             str_offsets.append(len(str_data))
-
             encoded = s.encode("utf-16le")
-
-            str_data.extend(struct.pack("<H", len(s)))
-
+            str_data.extend(struct.pack("<H", len(encoded) // 2))
             str_data.extend(encoded)
-
             str_data.extend(b"\x00\x00")
 
-
-
         pad = (4 - (len(str_data) % 4)) % 4
-
         str_data.extend(b"\x00" * pad)
 
-
-
         offsets_bytes = b"".join(struct.pack("<I", off) for off in str_offsets)
-
         sp_hdr_size = 28
-
         sp_chunk_size = sp_hdr_size + len(offsets_bytes) + len(str_data)
-
         sp_chunk = (
-
             struct.pack(
-
                 "<HHIIIIII",
-
                 0x0001,
-
                 sp_hdr_size,
-
                 sp_chunk_size,
-
                 len(strings),
-
                 0,
-
                 0,
-
                 sp_hdr_size + len(offsets_bytes),
-
                 0,
-
             )
-
             + offsets_bytes
-
             + bytes(str_data)
-
         )
 
-
+        # 4. Build RES_XML_RESOURCE_MAP_TYPE chunk (0x0180)
+        res_map_chunk = b""
+        if resource_ids:
+            rm_size = 8 + len(resource_ids) * 4
+            res_map_chunk = struct.pack("<HHI", CHUNK_RESOURCE_MAP, 8, rm_size) + struct.pack(
+                f"<{len(resource_ids)}I", *resource_ids
+            )
 
         def encode_element(elem: ET.Element) -> bytes:
-
             tag = elem.tag.split("}")[-1]
-
             tag_idx = strings.index(tag)
-
-            attrs = []
-
+            attrs: List[Tuple[int, int, int, int, int, int]] = []
             for k, v in elem.attrib.items():
-
-                attr_name = k.split("}")[-1]
-
+                attr_name = k.split("}")[-1].split(":")[-1]
                 attr_name_idx = strings.index(attr_name)
-
                 raw_idx = strings.index(v)
 
-
-
                 is_android = (
-
                     k.startswith(f"{{{ANDROID_NS}}}")
-
                     or k.startswith("android:")
-
-                    or (attr_name not in ("package", "split", "coreApp", "platformBuildVersionCode", "platformBuildVersionName") and not k.startswith("xmlns"))
-
+                    or (attr_name not in NON_ANDROID_ATTRS and not k.startswith("xmlns"))
                 )
-
                 attr_ns = ns_uri_idx if is_android else 0xFFFFFFFF
+                sort_key = mapped_attrs.get(attr_name, 0x7FFFFFFF) if is_android else 0xFFFFFFFF
 
-
-
-                if attr_name == "compileSdkVersionCodename":
-
+                if attr_name in ("compileSdkVersionCodename", "versionName", "package"):
                     val_type = TYPE_STRING
-
                     data_val = raw_idx
-
                 elif v.isdigit():
-
                     val_type = TYPE_INT_DEC
-
                     data_val = int(v)
-
                 elif v.startswith("-") and v[1:].isdigit():
-
                     val_type = TYPE_INT_DEC
-
                     data_val = int(v) & 0xFFFFFFFF
-
                 elif v.lower() in ("true", "false"):
-
                     val_type = TYPE_INT_BOOLEAN
-
                     data_val = 0xFFFFFFFF if v.lower() == "true" else 0
-
                 elif v.startswith(("@0x", "@0X")):
-
                     try:
-
                         val_type = TYPE_REFERENCE
-
                         data_val = int(v[1:], 16) & 0xFFFFFFFF
-
                     except ValueError:
-
                         val_type = TYPE_STRING
-
                         data_val = raw_idx
-
                 elif v.startswith("@") and v[1:].isdigit():
-
                     val_type = TYPE_REFERENCE
-
                     data_val = int(v[1:]) & 0xFFFFFFFF
-
                 elif v.startswith(("0x", "0X")):
-
                     try:
-
                         val_type = TYPE_INT_HEX
-
                         data_val = int(v, 16) & 0xFFFFFFFF
-
                     except ValueError:
-
                         val_type = TYPE_STRING
-
                         data_val = raw_idx
-
                 else:
-
                     val_type = TYPE_STRING
-
                     data_val = raw_idx
 
+                attrs.append((sort_key, attr_ns, attr_name_idx, raw_idx, val_type, data_val))
 
-
-                attrs.append((attr_ns, attr_name_idx, raw_idx, val_type, data_val))
-
-
+            # Sort attributes by ascending Android Resource ID (required by ResXMLParser)
+            attrs.sort(key=lambda item: (item[0], item[2]))
 
             attr_bytes = bytearray()
-
-            for attr_ns, a_name_idx, raw_idx, val_type, data_val in attrs:
-
+            for _, attr_ns, a_name_idx, raw_idx, val_type, data_val in attrs:
                 attr_bytes.extend(
-
                     struct.pack("<IIIHBB I", attr_ns, a_name_idx, raw_idx, 8, 0, val_type, data_val)
-
                 )
 
-
-
             extra = struct.pack("<IIHHHHHH", 0xFFFFFFFF, tag_idx, 20, 20, len(attrs), 0, 0, 0)
-
             chunk_size = 16 + 20 + len(attr_bytes)
-
             start_chunk = struct.pack("<HHIII", 0x0102, 16, chunk_size, 1, 0xFFFFFFFF) + extra + bytes(attr_bytes)
 
-
-
             children_bytes = bytearray()
-
             for child in elem:
-
                 children_bytes.extend(encode_element(child))
 
-
-
             end_chunk = struct.pack("<HHIII", 0x0103, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", 0xFFFFFFFF, tag_idx)
-
             return start_chunk + bytes(children_bytes) + end_chunk
 
-
-
         ns_start = struct.pack("<HHIII", 0x0100, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", ns_prefix_idx, ns_uri_idx)
-
         ns_end = struct.pack("<HHIII", 0x0101, 16, 24, 1, 0xFFFFFFFF) + struct.pack("<II", ns_prefix_idx, ns_uri_idx)
 
-
-
         body = ns_start + encode_element(root) + ns_end
-
-        total_len = 8 + len(sp_chunk) + len(body)
-
+        total_len = 8 + len(sp_chunk) + len(res_map_chunk) + len(body)
         header = struct.pack("<HHI", 0x0003, 8, total_len)
+        return header + sp_chunk + res_map_chunk + body
 
-        return header + sp_chunk + body
+    @classmethod
+    def patch_binary_axml(
+        cls,
+        axml_bytes: bytes,
+        package_name: Optional[str] = None,
+        app_label: Optional[str] = None,
+        version_code: Optional[int] = None,
+        version_name: Optional[str] = None,
+    ) -> bytes:
+        """Patches package_name, app_label, version_code, and version_name inside a binary AXML manifest."""
+        if len(axml_bytes) < 36 or axml_bytes[:2] != b"\x03\x00":
+            return axml_bytes
+
+        from pureapk.resources import _build_string_pool
+
+        view = memoryview(axml_bytes)
+        sp_hdr = struct.unpack_from("<HHIIIIII", view, 8)
+        sp_hdr_size, sp_size, str_count, _, flags, str_start, _ = (
+            sp_hdr[1],
+            sp_hdr[2],
+            sp_hdr[3],
+            sp_hdr[4],
+            sp_hdr[5],
+            sp_hdr[6],
+            sp_hdr[7],
+        )
+        is_utf8 = bool(flags & UTF8_FLAG)
+        offsets = struct.unpack_from(f"<{str_count}I", view, 8 + sp_hdr_size) if str_count else ()
+        sp = StringPool(view, is_utf8, offsets, 8 + str_start)
+        strings = [sp.get(i) for i in range(str_count)]
+
+        body = bytearray(axml_bytes[8 + sp_size :])
+        pos = 0
+        old_pkg: Optional[str] = None
+        while pos + 8 <= len(body):
+            ct, hs, cs = struct.unpack_from("<HHI", body, pos)
+            if cs < 8 or pos + cs > len(body):
+                break
+            if ct == CHUNK_START_ELEMENT and pos + 36 <= len(body):
+                _, name_idx, _, _, attr_count, _, _, _ = struct.unpack_from("<IIHHHHHH", body, pos + 16)
+                tag_name = strings[name_idx] if 0 <= name_idx < len(strings) else ""
+                attr_base = pos + 36
+                for i in range(attr_count):
+                    a_off = attr_base + i * 20
+                    if a_off + 20 > pos + cs:
+                        break
+                    a_ns, a_name_idx, a_raw_idx, a_sz, a_r0, a_type, a_data = struct.unpack_from(
+                        "<IIIHBBI", body, a_off
+                    )
+                    attr_name = strings[a_name_idx] if 0 <= a_name_idx < len(strings) else ""
+                    if tag_name == "manifest":
+                        if attr_name == "package" and package_name and 0 <= a_data < len(strings):
+                            old_pkg = strings[a_data]
+                            strings[a_data] = package_name
+                        elif attr_name == "versionCode" and version_code is not None:
+                            struct.pack_into("<I", body, a_off + 16, int(version_code) & 0xFFFFFFFF)
+                        elif attr_name == "versionName" and version_name and 0 <= a_data < len(strings):
+                            strings[a_data] = version_name
+                    elif tag_name in ("application", "activity") and attr_name == "label" and app_label:
+                        if a_type == TYPE_STRING and 0 <= a_data < len(strings):
+                            strings[a_data] = app_label
+            pos += cs
+
+        if old_pkg and package_name and old_pkg != package_name:
+            for idx, s in enumerate(strings):
+                if s == old_pkg:
+                    strings[idx] = package_name
+                elif s.startswith(old_pkg + "."):
+                    strings[idx] = package_name + s[len(old_pkg) :]
+
+        new_sp = _build_string_pool(strings, utf8=is_utf8)
+        total_len = 8 + len(new_sp) + len(body)
+        return struct.pack("<HHI", CHUNK_AXML_HEADER, 8, total_len) + new_sp + bytes(body)
+
 
 
 

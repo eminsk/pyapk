@@ -103,35 +103,78 @@ class ReleaseHelper:
         return "\n".join(filtered)
 
     @staticmethod
+    def _xor_keystream(data: bytes, enc_key: bytes, salt: bytes) -> bytes:
+        """Encrypts/decrypts payload bytes using a counter-mode SHA-256 keystream."""
+        out = bytearray(len(data))
+        block_idx = 0
+        for off in range(0, len(data), 32):
+            block = hashlib.sha256(enc_key + salt + block_idx.to_bytes(4, "big")).digest()
+            chunk = data[off : off + 32]
+            for i, b in enumerate(chunk):
+                out[off + i] = b ^ block[i]
+            block_idx += 1
+        return bytes(out)
+
+    @staticmethod
     def generate_release_keystore(
         output_keystore_path: Union[str, Path],
         key_alias: str = "release",
         store_pass: str = "android",
         validity_days: int = 10000,
     ) -> Dict[str, Any]:
-        """Generates a standalone release metadata profile for store signing."""
+        """Generates a standalone cryptographic RSA-2048 release keystore with a self-signed X.509v3 certificate."""
+        import hmac
+        import json
+        from pureapk.signature import build_self_signed_cert_der, generate_rsa_keypair
+
         p = Path(output_keystore_path)
         p.parent.mkdir(parents=True, exist_ok=True)
-        # Create deterministic cryptographic seed
-        salt = os.urandom(32)
-        key_seed = hashlib.sha256(salt + store_pass.encode("utf-8") + key_alias.encode("utf-8")).digest()
 
-        metadata = {
+        n, e, d = generate_rsa_keypair(bits=2048)
+        cert_der, pubkey_der = build_self_signed_cert_der(
+            n=n,
+            d=d,
+            e=e,
+            common_name=key_alias or "Release",
+            organization="PureAPK Release",
+            country="US",
+            validity_days=validity_days,
+        )
+
+        sha256_fp = hashlib.sha256(cert_der).hexdigest().upper()
+        sha1_fp = hashlib.sha1(cert_der).hexdigest().upper()
+
+        payload_dict = {
             "key_alias": key_alias,
             "validity_days": validity_days,
-            "sha256_fingerprint": hashlib.sha256(key_seed).hexdigest().upper(),
-            "sha1_fingerprint": hashlib.sha1(key_seed).hexdigest().upper(),
-            "algorithm": "SHA256withRSA",
-            "key_size": 2048,
+            "cert_b64": base64.b64encode(cert_der).decode("ascii"),
+            "pubkey_b64": base64.b64encode(pubkey_der).decode("ascii"),
+            "rsa_n": hex(n)[2:],
+            "rsa_e": e,
+            "rsa_d": hex(d)[2:],
         }
+        payload_bytes = json.dumps(payload_dict, separators=(",", ":")).encode("utf-8")
 
-        # Store encrypted/salted release profile
+        salt = os.urandom(32)
+        derived = hashlib.pbkdf2_hmac("sha256", (store_pass or "").encode("utf-8"), salt, 10000, dklen=64)
+        enc_key, mac_key = derived[:32], derived[32:]
+        ciphertext = ReleaseHelper._xor_keystream(payload_bytes, enc_key, salt)
+        mac_tag = hmac.new(mac_key, salt + ciphertext, hashlib.sha256).digest()
+
         with open(p, "wb") as f:
             f.write(b"PUREAPK-RELEASE-KEYSTORE-V1\n")
             f.write(base64.b64encode(salt) + b"\n")
-            f.write(base64.b64encode(key_seed) + b"\n")
+            f.write(base64.b64encode(mac_tag) + b"\n")
+            f.write(base64.b64encode(ciphertext) + b"\n")
 
-        return metadata
+        return {
+            "key_alias": key_alias,
+            "validity_days": validity_days,
+            "sha256_fingerprint": sha256_fp,
+            "sha1_fingerprint": sha1_fp,
+            "algorithm": "SHA256withRSA",
+            "key_size": 2048,
+        }
 
     @staticmethod
     def load_release_keystore(
@@ -139,30 +182,113 @@ class ReleaseHelper:
         store_pass: str = "",
         key_alias: str = "",
     ) -> Dict[str, Any]:
-        """Loads and verifies a release signing keystore profile."""
+        """Loads, decrypts, and verifies a release signing keystore (PureAPK V1, PEM, or PKCS#12)."""
+        import hmac
+        import json
+        import re
+        from pureapk.signature import (
+            build_rsa_pubkey_der,
+            parse_pkcs1_or_pkcs8_rsa_key_der,
+        )
+
         p = Path(keystore_path)
         if not p.exists():
             raise FileNotFoundError(f"Keystore file not found: {keystore_path}")
         raw = p.read_bytes()
         lines = [line.strip() for line in raw.splitlines() if line.strip()]
+
         if lines and lines[0] == b"PUREAPK-RELEASE-KEYSTORE-V1":
-            salt = base64.b64decode(lines[1]) if len(lines) > 1 else b""
-            key_seed = base64.b64decode(lines[2]) if len(lines) > 2 else b""
+            if len(lines) < 4:
+                raise ValueError(f"Corrupted or incomplete PureAPK keystore: {keystore_path}")
+            salt = base64.b64decode(lines[1])
+            expected_mac = base64.b64decode(lines[2])
+            ciphertext = base64.b64decode(lines[3])
+
+            candidate_passwords = [store_pass] if store_pass else ["", "android"]
+            matched_derived: Optional[bytes] = None
+            for cand_pw in candidate_passwords:
+                derived = hashlib.pbkdf2_hmac("sha256", cand_pw.encode("utf-8"), salt, 10000, dklen=64)
+                mac_key = derived[32:]
+                actual_mac = hmac.new(mac_key, salt + ciphertext, hashlib.sha256).digest()
+                if hmac.compare_digest(actual_mac, expected_mac):
+                    matched_derived = derived
+                    break
+
+            if matched_derived is None:
+                raise ValueError("Invalid keystore password or corrupted keystore")
+
+            plaintext = ReleaseHelper._xor_keystream(ciphertext, matched_derived[:32], salt)
+            payload = json.loads(plaintext.decode("utf-8"))
+            stored_alias = payload.get("key_alias", "release")
+            if key_alias and key_alias not in ("release", "androiddebugkey", "debug", stored_alias):
+                raise ValueError(f"Key alias '{key_alias}' not found in keystore (available: '{stored_alias}')")
+
+            cert_der = base64.b64decode(payload["cert_b64"])
+            pubkey_der = base64.b64decode(payload["pubkey_b64"])
+            rsa_n = int(payload["rsa_n"], 16)
+            rsa_d = int(payload["rsa_d"], 16)
             return {
                 "valid": True,
                 "format": "PUREAPK-RELEASE-KEYSTORE-V1",
-                "key_alias": key_alias or "release",
-                "salt": salt,
-                "key_seed": key_seed,
-                "sha256_fingerprint": hashlib.sha256(key_seed).hexdigest().upper(),
-                "sha1_fingerprint": hashlib.sha1(key_seed).hexdigest().upper(),
+                "key_alias": stored_alias,
+                "cert_der": cert_der,
+                "pubkey_der": pubkey_der,
+                "rsa_n": rsa_n,
+                "rsa_d": rsa_d,
+                "sha256_fingerprint": hashlib.sha256(cert_der).hexdigest().upper(),
+                "sha1_fingerprint": hashlib.sha1(cert_der).hexdigest().upper(),
             }
-        return {
-            "valid": True,
-            "format": "BINARY",
-            "key_alias": key_alias or "release",
-            "raw": raw,
-        }
+
+        # Support PEM certificate + private key files directly in pure Python
+        if b"-----BEGIN" in raw:
+            txt = raw.decode("utf-8", errors="ignore")
+            cert_m = re.search(r"-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", txt, re.DOTALL)
+            key_m = re.search(
+                r"-----BEGIN (?:RSA )?PRIVATE KEY-----(.*?)-----END (?:RSA )?PRIVATE KEY-----",
+                txt,
+                re.DOTALL,
+            )
+            if not cert_m or not key_m:
+                raise ValueError("PEM keystore must contain both CERTIFICATE and PRIVATE KEY blocks")
+            cert_der = base64.b64decode("".join(cert_m.group(1).split()))
+            key_der = base64.b64decode("".join(key_m.group(1).split()))
+            rsa_n, rsa_e, rsa_d = parse_pkcs1_or_pkcs8_rsa_key_der(key_der)
+            pubkey_der = build_rsa_pubkey_der(rsa_n, rsa_e)
+            return {
+                "valid": True,
+                "format": "PEM",
+                "key_alias": key_alias or "release",
+                "cert_der": cert_der,
+                "pubkey_der": pubkey_der,
+                "rsa_n": rsa_n,
+                "rsa_d": rsa_d,
+                "sha256_fingerprint": hashlib.sha256(cert_der).hexdigest().upper(),
+                "sha1_fingerprint": hashlib.sha1(cert_der).hexdigest().upper(),
+            }
+
+        # Support PKCS#12 (.p12 / .pfx) via OpenSSL when available
+        openssl_bin = shutil.which("openssl")
+        if openssl_bin:
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmp_d:
+                pem_out = Path(tmp_d) / "bundle.pem"
+                cmd = [
+                    openssl_bin,
+                    "pkcs12",
+                    "-in",
+                    str(p),
+                    "-nodes",
+                    "-out",
+                    str(pem_out),
+                    "-passin",
+                    f"pass:{store_pass}",
+                ]
+                res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if res.returncode == 0 and pem_out.exists():
+                    return ReleaseHelper.load_release_keystore(pem_out, store_pass=store_pass, key_alias=key_alias)
+
+        raise ValueError(f"Unsupported or invalid keystore format: {keystore_path}")
 
 
 # ==============================================================================

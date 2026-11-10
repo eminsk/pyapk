@@ -142,17 +142,29 @@ def cmd_verify(args: argparse.Namespace) -> int:
         res = apk.verify()
 
         def _print_human() -> None:
+            runnable_flag = res.get("runnable_on_device", False)
+            runnable_desc = (
+                "Full Native Python Runtime"
+                if runnable_flag
+                else "Skeleton — missing native Python runtime in lib/<abi>/"
+                if res.get("is_skeleton")
+                else "Not runnable"
+            )
             print(
-                f"Valid Integrity: {res['is_valid']}\n"
-                f"Corrupted File:  {res['corrupted_file'] or 'None'}\n"
-                f"Signed:          {res['is_signed']} ({', '.join(res['signature_schemes']) or 'none'})\n"
-                f"16KB Aligned:    {res['so_16k_compliant']} ({'Android 15 ready' if res['so_16k_compliant'] else 'needs zipalign'})\n"
-                f"Fully Aligned:   {res['is_aligned']}\n"
-                f"Device Ready:    {res.get('device_installable', False)} (Valid DEX & Resource Table)\n"
-                f"Runtime Mode:    {'Full Native' if res.get('has_native_runtime') else 'Skeleton (No lib/*.so runtime)' if res.get('is_skeleton') else 'Standard'}"
+                f"Valid Integrity:  {res['is_valid']}\n"
+                f"Corrupted File:   {res['corrupted_file'] or 'None'}\n"
+                f"Signed:           {res['is_signed']} ({', '.join(res['signature_schemes']) or 'none'})\n"
+                f"16KB Aligned:     {res['so_16k_compliant']} ({'Android 15 ready' if res['so_16k_compliant'] else 'needs zipalign'})\n"
+                f"Fully Aligned:    {res['is_aligned']}\n"
+                f"Structural Parse: {res.get('structural_parse_ready', False)} (Valid AXML, DEX & Resource Table)\n"
+                f"Runnable App:     {runnable_flag} ({runnable_desc})\n"
+                f"Runtime Mode:     {'Full Native' if res.get('has_native_runtime') else 'Skeleton (No lib/*.so runtime)' if res.get('is_skeleton') else 'Standard'}"
             )
             if res.get("is_skeleton"):
-                print("  Warning: Skeleton APK has no native Python runtime in lib/<abi>/. Run 'pureapk unpack-wheel' or 'pureapk init-ci --cython' to bundle Python.")
+                print(
+                    "  Warning: Skeleton APK has no native Python runtime in lib/<abi>/. "
+                    "Pass '--runtime-apk <base.apk>', run 'pureapk prepare-runtime', or use 'pureapk unpack-wheel' to bundle Python."
+                )
 
         output_dispatch = {
             True: lambda: _print_json(res),
@@ -349,6 +361,20 @@ def cmd_init_pygame(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prepare_runtime(args: argparse.Namespace) -> int:
+    from pureapk.frameworks import KivyAppHelper
+    res = KivyAppHelper.prepare_runtime(args.from_apk, args.target_dir)
+    if getattr(args, "json", False):
+        _print_json(res)
+    else:
+        print(f"Successfully prepared Python/Kivy runtime in: {res['target_dir']}")
+        print(f"  + ABIs:          {', '.join(res['abis']) or 'none'}")
+        print(f"  + Native .so:    {res['extracted_so_count']} libraries")
+        print(f"  + DEX classes:   {', '.join(res['dex_files']) or 'none'}")
+        print(f"  + Target Python: {res.get('python_version') or 'unknown'}")
+    return 0
+
+
 def cmd_pack_kivy(args: argparse.Namespace) -> int:
     from pureapk.frameworks import KivyAppHelper
     KivyAppHelper.pack_app(
@@ -361,6 +387,7 @@ def cmd_pack_kivy(args: argparse.Namespace) -> int:
         keystore=getattr(args, "keystore", None),
         password=getattr(args, "password", ""),
         alias=getattr(args, "alias", None),
+        runtime_apk=getattr(args, "runtime_apk", None),
     )
     print(f"Successfully packaged Kivy APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
@@ -378,6 +405,7 @@ def cmd_pack_pygame(args: argparse.Namespace) -> int:
         keystore=getattr(args, "keystore", None),
         password=getattr(args, "password", ""),
         alias=getattr(args, "alias", None),
+        runtime_apk=getattr(args, "runtime_apk", None),
     )
     print(f"Successfully packaged Pygame APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
@@ -925,6 +953,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_pygame.add_argument("target_dir", help="Target project folder")
     p_pygame.add_argument("--title", default="Pygame App", help="App title")
 
+    # prepare-runtime
+    p_prep_rt = subparsers.add_parser("prepare-runtime", help="Extract native Python/Kivy runtime (lib/*.so, classes*.dex, resources.arsc) from a base APK or folder into a project")
+    p_prep_rt.add_argument("target_dir", help="Target project folder to populate with runtime files")
+    p_prep_rt.add_argument("--from-apk", required=True, help="Path to base runtime APK (e.g. WeatherTest.apk) or extracted runtime directory")
+    p_prep_rt.add_argument("--json", action="store_true", help="Output results as JSON")
+
     # pack-kivy
     p_pack_kivy = subparsers.add_parser("pack-kivy", help="Pack a Kivy project directory into an APK")
     p_pack_kivy.add_argument("source_dir", help="Kivy project folder")
@@ -936,6 +970,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_kivy.add_argument("--keystore", help="Path to release keystore or signing profile")
     p_pack_kivy.add_argument("--password", default="", help="Keystore password")
     p_pack_kivy.add_argument("--alias", help="Key alias in keystore")
+    p_pack_kivy.add_argument("--runtime-apk", help="Path to base p4a/Kivy runtime APK or directory to bundle lib/*.so and classes*.dex")
 
     # pack-pygame
     p_pack_pygame = subparsers.add_parser("pack-pygame", help="Pack a Pygame project directory into an APK")
@@ -948,6 +983,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_pygame.add_argument("--keystore", help="Path to release keystore or signing profile")
     p_pack_pygame.add_argument("--password", default="", help="Keystore password")
     p_pack_pygame.add_argument("--alias", help="Key alias in keystore")
+    p_pack_pygame.add_argument("--runtime-apk", help="Path to base p4a/Pygame runtime APK or directory to bundle lib/*.so and classes*.dex")
 
     # init-flet
     p_init_flet = subparsers.add_parser("init-flet", help="Scaffold a Flet (Flutter/Python) mobile project")
@@ -1140,7 +1176,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     known_commands = {
         "info", "manifest", "permissions", "dex", "files", "verify", "verify-ipa", "extract", "pack",
         "zipalign", "pack-wheel", "unpack-wheel", "install-wheel", "init-ci",
-        "init-kivy", "init-pygame", "pack-kivy", "pack-pygame",
+        "init-kivy", "init-pygame", "pack-kivy", "pack-pygame", "prepare-runtime",
         "init-flet", "pack-flet", "init-toga", "pack-toga",
         "init-renpy", "pack-renpy", "init-webview", "pack-webview", "init-pyside", "init-pyqt", "pack-pyside", "pack-pyqt",
         "pack-aab", "init-ios", "pack-ipa", "sign-ipa", "ipa-sign", "ipa-profile", "profile-ipa",
@@ -1187,6 +1223,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "init-ci": cmd_init_ci,
         "init-kivy": cmd_init_kivy,
         "init-pygame": cmd_init_pygame,
+        "prepare-runtime": cmd_prepare_runtime,
         "pack-kivy": cmd_pack_kivy,
         "pack-pygame": cmd_pack_pygame,
         "init-flet": cmd_init_flet,

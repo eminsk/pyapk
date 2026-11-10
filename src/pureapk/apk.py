@@ -351,41 +351,54 @@ class APK:
         return bool(self.check_alignment(so_alignment=16384, file_alignment=4)["so_16k_compliant"])
 
     def verify(self) -> Dict[str, Any]:
-        """Validates internal CRC checksums, signature schemes, 16KB/4B page alignment, and device installability."""
+        """Validates internal CRC checksums, signature schemes, 16KB/4B page alignment, structural parse validity, and runtime readiness."""
         bad_file = self.zip_file.testzip()
         is_corrupt = bad_file is not None
         align_info = self.check_alignment()
+        fnames = set(self.filenames)
 
-        # Android package install readiness checks
+        # Android native runtime checks
         has_native_runtime = len(self.native_architectures) > 0
         is_skeleton = bool(self.is_python_app and not has_native_runtime)
 
-        has_valid_arsc = True
-        if "resources.arsc" in self.files:
+        has_valid_arsc = False
+        if "resources.arsc" in fnames:
             from pureapk.resources import ArscBuilder
             try:
                 arsc_data = self.read("resources.arsc")
                 has_valid_arsc = ArscBuilder.is_valid_arsc(arsc_data)
             except Exception:
                 has_valid_arsc = False
+        elif "AndroidManifest.xml" not in fnames:
+            has_valid_arsc = True
 
-        # Check DEX launcher activity presence
+        # Check DEX launcher activity presence across classes*.dex
         launcher_activity_present = True
-        if self.activities and "classes.dex" in self.files:
+        dex_files = sorted(n for n in fnames if "/" not in n and n.startswith("classes") and n.endswith(".dex"))
+        if self.activities and dex_files:
             try:
                 from pureapk.dex import DexBuilder
-                dex_data = self.read("classes.dex")
-                dex_classes = set(DexBuilder.extract_class_names(dex_data))
+                dex_classes: Set[str] = set()
+                for df in dex_files:
+                    dex_classes.update(DexBuilder.extract_class_names(self.read(df)))
                 if dex_classes:
                     launcher_activity_present = any(act in dex_classes for act in self.activities)
             except Exception:
-                pass
+                launcher_activity_present = False
+        elif self.activities and not dex_files:
+            launcher_activity_present = False
 
-        device_installable = bool(
+        structural_parse_ready = bool(
             not is_corrupt
             and self.signature.is_signed
             and has_valid_arsc
             and launcher_activity_present
+        )
+
+        runnable_on_device = bool(
+            structural_parse_ready
+            and (has_native_runtime if self.is_python_app else True)
+            and not is_skeleton
         )
 
         return {
@@ -400,7 +413,9 @@ class APK:
             "has_native_runtime": has_native_runtime,
             "is_skeleton": is_skeleton,
             "launcher_activity_present": launcher_activity_present,
-            "device_installable": device_installable,
+            "structural_parse_ready": structural_parse_ready,
+            "runnable_on_device": runnable_on_device,
+            "device_installable": structural_parse_ready,
         }
 
     def info(self) -> Dict[str, Any]:

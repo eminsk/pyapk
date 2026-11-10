@@ -410,7 +410,7 @@ class DexBuilder:
             methods.append((t_idx, proto_init_idx, str_to_idx["<init>"]))
             methods.append((t_idx, proto_oncreate_idx, str_to_idx["onCreate"]))
 
-        methods = sorted(methods, key=lambda m: (m[0], m[1], m[2]))
+        methods = sorted(methods, key=lambda m: (m[0], m[2], m[1]))
         method_to_idx = {m: i for i, m in enumerate(methods)}
         super_init_idx = method_to_idx[(type_to_idx["Landroid/app/Activity;"], proto_init_idx, str_to_idx["<init>"])]
         super_oncreate_idx = method_to_idx[(type_to_idx["Landroid/app/Activity;"], proto_oncreate_idx, str_to_idx["onCreate"])]
@@ -460,25 +460,24 @@ class DexBuilder:
             data_buf.append(0)
         data_buf = bytearray(_align(bytes(data_buf), 4))
 
-        # 3. Code item for <init>()
-        # registers=1, ins=1, outs=1, tries=0, debug=0, insns_size=4
-        # Dalvik: invoke-direct {v0}, Activity.<init>() -> 0x1070, super_init_idx, 0x0000, 0x000e (return-void)
-        code_init_off = data_off + len(data_buf)
-        code_init = struct.pack("<HHHHII", 1, 1, 1, 0, 0, 4)
-        code_init += struct.pack("<HHH", 0x1070, super_init_idx, 0x0000)
-        code_init += struct.pack("<H", 0x000e)
-        data_buf.extend(code_init)
-        data_buf = bytearray(_align(bytes(data_buf), 4))
+        # 3. Code items for each class (<init>() and onCreate(Bundle))
+        first_code_off = data_off + len(data_buf)
+        code_init_offs = {}
+        code_oncreate_offs = {}
+        for c_idx in classes:
+            code_init_offs[c_idx] = data_off + len(data_buf)
+            code_init = struct.pack("<HHHHII", 1, 1, 1, 0, 0, 4)
+            code_init += struct.pack("<HHH", 0x1070, super_init_idx, 0x0000)
+            code_init += struct.pack("<H", 0x000e)
+            data_buf.extend(code_init)
+            data_buf = bytearray(_align(bytes(data_buf), 4))
 
-        # Code item for onCreate(Bundle)
-        # registers=2, ins=2, outs=2, tries=0, debug=0, insns_size=4
-        # Dalvik: invoke-super {v0, v1}, Activity.onCreate() -> 0x206f, super_oncreate_idx, 0x0010, 0x000e (return-void)
-        code_oncreate_off = data_off + len(data_buf)
-        code_oncreate = struct.pack("<HHHHII", 2, 2, 2, 0, 0, 4)
-        code_oncreate += struct.pack("<HHH", 0x206f, super_oncreate_idx, 0x0010)
-        code_oncreate += struct.pack("<H", 0x000e)
-        data_buf.extend(code_oncreate)
-        data_buf = bytearray(_align(bytes(data_buf), 4))
+            code_oncreate_offs[c_idx] = data_off + len(data_buf)
+            code_oncreate = struct.pack("<HHHHII", 2, 2, 2, 0, 0, 4)
+            code_oncreate += struct.pack("<HHH", 0x206f, super_oncreate_idx, 0x0010)
+            code_oncreate += struct.pack("<H", 0x000e)
+            data_buf.extend(code_oncreate)
+            data_buf = bytearray(_align(bytes(data_buf), 4))
 
         # 4. Class data items for each class
         class_data_offsets = {}
@@ -496,12 +495,12 @@ class DexBuilder:
             # direct method: <init>
             cd.extend(_encode_uleb128(m_init))
             cd.extend(_encode_uleb128(0x10001))  # ACC_PUBLIC | ACC_CONSTRUCTOR
-            cd.extend(_encode_uleb128(code_init_off))
+            cd.extend(_encode_uleb128(code_init_offs[c_idx]))
 
             # virtual method: onCreate
             cd.extend(_encode_uleb128(m_oncreate))
             cd.extend(_encode_uleb128(0x0001))  # ACC_PUBLIC
-            cd.extend(_encode_uleb128(code_oncreate_off))
+            cd.extend(_encode_uleb128(code_oncreate_offs[c_idx]))
 
             data_buf.extend(cd)
         data_buf = bytearray(_align(bytes(data_buf), 4))
@@ -517,9 +516,9 @@ class DexBuilder:
             (0x0006, class_defs_size, class_defs_off),  # CLASS_DEF_ITEM
             (0x1001, 1, bundle_type_list_off),          # TYPE_LIST
             (0x2002, string_ids_size, string_offsets[0]),  # STRING_DATA_ITEM
-            (0x2001, 2, code_init_off),                 # CODE_ITEM
+            (0x2001, 2 * len(classes), first_code_off),    # CODE_ITEM
             (0x2000, class_defs_size, class_data_offsets[classes[0]]),  # CLASS_DATA_ITEM
-            (0x1000, 11, map_off),                      # MAP_LIST
+            (0x1000, 1, map_off),                       # MAP_LIST (1 map_list item)
         ]
         map_data = struct.pack("<I", len(map_items))
         for t, count, off in map_items:

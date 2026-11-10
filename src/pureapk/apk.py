@@ -357,8 +357,12 @@ class APK:
         align_info = self.check_alignment()
         fnames = set(self.filenames)
 
-        # Android native runtime checks
-        has_native_runtime = len(self.native_architectures) > 0
+        # Android native runtime checks (reject tiny <64B ELF header stubs)
+        valid_so_files = [
+            f for f in self.files
+            if f.filename.startswith("lib/") and f.filename.endswith(".so") and f.file_size >= 64
+        ]
+        has_native_runtime = len(valid_so_files) > 0
         is_skeleton = bool(self.is_python_app and not has_native_runtime)
 
         has_valid_arsc = False

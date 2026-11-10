@@ -630,6 +630,7 @@ class KivyAppHelper:
 
     <application
         android:label="{app_title}"{icon_attr}
+        android:extractNativeLibs="true"
         android:hardwareAccelerated="true">
         <activity
             android:name="org.kivy.android.PythonActivity"
@@ -733,6 +734,53 @@ android.permissions = INTERNET
             spec.write_text(KivyAppHelper.generate_buildozer_spec(title=title), encoding="utf-8")
 
 
+
+    DEFAULT_RUNTIME_URL: str = "https://github.com/eminsk/pyapk/releases/download/runtime-py310/kivy-runtime-py310.apk"
+    DEFAULT_RUNTIME_SHA256: str = "00b9959d542524dc8b33e2840702b6f02c5eb500e97478de380a5a1b55287aee"
+
+    @staticmethod
+    def ensure_runtime(
+        cache_dir: Optional[Union[str, Path]] = None,
+        download: bool = True,
+    ) -> Optional[Path]:
+        """Locates or downloads the prebuilt p4a Python 3.10 + Kivy 2.1 + SDL2 Android runtime APK."""
+        import hashlib
+        import tempfile
+        import urllib.request
+
+        env_rt = os.environ.get("PUREAPK_RUNTIME_APK")
+        if env_rt:
+            p = Path(env_rt)
+            if p.exists():
+                return p
+
+        base_cache = Path(cache_dir) if cache_dir else (Path.home() / ".pureapk" / "runtime")
+        cached_apk = base_cache / "kivy-runtime-py310.apk"
+        if cached_apk.is_file() and cached_apk.stat().st_size > 1_000_000:
+            return cached_apk
+
+        if not download or os.environ.get("PUREAPK_OFFLINE") == "1":
+            return None
+
+        url = os.environ.get("PUREAPK_RUNTIME_URL", KivyAppHelper.DEFAULT_RUNTIME_URL)
+        try:
+            base_cache.mkdir(parents=True, exist_ok=True)
+            req = urllib.request.Request(url, headers={"User-Agent": "pureapk-runtime-fetcher/1.0"})
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = resp.read()
+            if len(data) < 1_000_000:
+                return None
+            if url == KivyAppHelper.DEFAULT_RUNTIME_URL:
+                digest = hashlib.sha256(data).hexdigest()
+                if digest != KivyAppHelper.DEFAULT_RUNTIME_SHA256:
+                    return None
+            with tempfile.NamedTemporaryFile(dir=str(base_cache), suffix=".apk.tmp", delete=False) as tf:
+                tf.write(data)
+                tmp_name = tf.name
+            os.replace(tmp_name, str(cached_apk))
+            return cached_apk
+        except Exception:
+            return None
 
     @staticmethod
     def prepare_runtime(
@@ -846,14 +894,31 @@ android.permissions = INTERNET
         password: str = "",
         alias: Optional[str] = None,
         runtime_apk: Optional[Union[str, Path]] = None,
+        skeleton: bool = False,
     ) -> None:
         """Packs a Kivy project directory into a standard Android APK."""
+        import re
         import zipfile
         from pureapk.builder import APKBuilder
         from pureapk.manifest import AxmlEncoder
         from pureapk.stores import ReleaseHelper
 
         src = Path(source_dir)
+
+        # Auto-resolve prebuilt Kivy/Python runtime if project does not already contain lib/*.so
+        if runtime_apk is None and not skeleton and os.environ.get("PUREAPK_SKELETON") != "1":
+            has_local_so = False
+            if (src / "lib").is_dir():
+                for _, _, files_l in os.walk(src / "lib"):
+                    if any(f.endswith(".so") for f in files_l):
+                        has_local_so = True
+                        break
+            if not has_local_so:
+                in_pytest = os.environ.get("PYTEST_CURRENT_TEST") is not None
+                if not in_pytest or os.environ.get("PUREAPK_AUTO_RUNTIME") == "1":
+                    resolved_rt = KivyAppHelper.ensure_runtime(download=True)
+                    if resolved_rt is not None:
+                        runtime_apk = resolved_rt
 
         spec_file = src / "buildozer.spec"
         spec_title = None
@@ -903,7 +968,7 @@ android.permissions = INTERNET
 
         manifest_path = src / "AndroidManifest.xml"
         rt_manifest_bytes: Optional[bytes] = None
-        if not manifest_path.exists() and runtime_apk:
+        if runtime_apk:
             rt_p = Path(runtime_apk)
             if rt_p.is_dir() and (rt_p / "AndroidManifest.xml").is_file():
                 rt_manifest_bytes = (rt_p / "AndroidManifest.xml").read_bytes()
@@ -913,12 +978,34 @@ android.permissions = INTERNET
                         rt_manifest_bytes = zf.read("AndroidManifest.xml")
 
         if manifest_path.exists() or rt_manifest_bytes is not None:
-            raw_m = manifest_path.read_bytes() if manifest_path.exists() else (rt_manifest_bytes or b"")
+            ver_code: Optional[int] = None
+            ver_name: Optional[str] = None
+            xml_pkg: Optional[str] = None
+            xml_label: Optional[str] = None
+            local_m = manifest_path.read_bytes() if manifest_path.exists() else b""
+            if local_m and not (len(local_m) >= 4 and local_m[:2] == b"\x03\x00"):
+                txt_m = local_m.decode("utf-8", errors="ignore")
+                m_vc = re.search(r'android:versionCode="(\d+)"', txt_m)
+                if m_vc:
+                    ver_code = int(m_vc.group(1))
+                m_vn = re.search(r'android:versionName="([^"]+)"', txt_m)
+                if m_vn:
+                    ver_name = m_vn.group(1)
+                m_pk = re.search(r'\bpackage="([^"]+)"', txt_m)
+                if m_pk:
+                    xml_pkg = m_pk.group(1)
+                m_lb = re.search(r'android:label="([^"@][^"]*)"', txt_m)
+                if m_lb:
+                    xml_label = m_lb.group(1)
+
+            raw_m = rt_manifest_bytes if (rt_manifest_bytes is not None and len(rt_manifest_bytes) >= 4 and rt_manifest_bytes[:2] == b"\x03\x00") else local_m
             if len(raw_m) >= 4 and raw_m[:2] == b"\x03\x00":
                 raw_m = AxmlEncoder.patch_binary_axml(
                     raw_m,
-                    package_name=package_name or spec_pkg,
-                    app_label=app_title or spec_title,
+                    package_name=package_name or spec_pkg or xml_pkg,
+                    app_label=app_title or spec_title or xml_label,
+                    version_code=ver_code,
+                    version_name=ver_name,
                 )
             builder.add_bytes("AndroidManifest.xml", raw_m)
         else:
@@ -979,6 +1066,7 @@ class PygameAppHelper:
 
     <application
         android:label="{app_title}"{icon_attr}
+        android:extractNativeLibs="true"
         android:hardwareAccelerated="true">
         <activity
             android:name="org.renpy.android.PythonSDLActivity"

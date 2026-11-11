@@ -23,6 +23,8 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+*.log
+*last_crash.txt
 
 # IDE files
 .vscode/

@@ -314,8 +314,11 @@ def test_cli_pack_and_sign_keystore(tmp_path: Path, capsys: pytest.CaptureFixtur
     assert "Runtime Mode:     Skeleton" in captured.out
 
 
-def _create_mock_p4a_runtime_apk(apk_path: Path) -> None:
+def _create_mock_p4a_runtime_apk(apk_path: Path, py_ver: Optional[str] = None) -> str:
     """Builds a minimal mock p4a runtime APK with native .so libraries, multi-dex, arsc, and manifest."""
+    import sys
+    if py_ver is None:
+        py_ver = f"{sys.version_info[0]}.{sys.version_info[1]}"
     arsc_bytes = ArscBuilder.generate_minimal_arsc(
         package_name="org.test.baseapp",
         app_name="Base Template App",
@@ -346,17 +349,19 @@ def _create_mock_p4a_runtime_apk(apk_path: Path) -> None:
         zf.writestr("resources.arsc", arsc_bytes)
         zf.writestr("classes.dex", dex1)
         zf.writestr("classes2.dex", dex2)
-        zf.writestr("lib/arm64-v8a/libpython3.10.so", b"\x7fELF" + b"\x01" * 128)
+        zf.writestr(f"lib/arm64-v8a/libpython{py_ver}.so", b"\x7fELF" + b"\x01" * 128)
         zf.writestr("lib/arm64-v8a/libpybundle.so", b"\x7fELF" + b"\x02" * 128)
         zf.writestr("lib/arm64-v8a/libSDL2.so", b"\x7fELF" + b"\x03" * 128)
         zf.writestr("res/drawable-mdpi-v4/icon.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
         zf.writestr("res/mipmap-hdpi/ic_launcher.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 32)
+    return py_ver
 
 
 def test_prepare_runtime_and_pack_runnable_kivy_apk(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Tests both --runtime-apk direct packaging and prepare-runtime seeding for runnable Kivy APKs."""
+    import sys
     base_runtime_apk = tmp_path / "base_runtime.apk"
-    _create_mock_p4a_runtime_apk(base_runtime_apk)
+    py_ver = _create_mock_p4a_runtime_apk(base_runtime_apk)
 
     project_dir = tmp_path / "calc_project"
     KivyAppHelper.init_project(project_dir, title="Scientific Calculator")
@@ -380,20 +385,23 @@ def test_prepare_runtime_and_pack_runnable_kivy_apk(tmp_path: Path, capsys: pyte
     assert out_apk.exists()
 
     with APK(out_apk) as apk:
-        assert "lib/arm64-v8a/libpython3.10.so" in apk.filenames
+        assert f"lib/arm64-v8a/libpython{py_ver}.so" in apk.filenames
         assert "lib/arm64-v8a/libpybundle.so" in apk.filenames
         assert "classes.dex" in apk.filenames
         assert "classes2.dex" in apk.filenames
         assert "assets/private.tar" in apk.filenames
 
-        # Check sitecustomize.pyc and main.pyc inside private.tar
+        # Check sitecustomize and main inside private.tar
         tar_bytes = apk.read("assets/private.tar")
         expected_priv_ver = hashlib.sha1(tar_bytes).hexdigest()
         with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tf:
             names = tf.getnames()
-            assert "sitecustomize.pyc" in names
+            assert "sitecustomize.py" in names
             assert "main.py" in names
-            assert "main.pyc" in names
+            host_ver = f"{sys.version_info[0]}.{sys.version_info[1]}"
+            if host_ver == py_ver and not hasattr(sys, "pypy_version_info"):
+                assert "sitecustomize.pyc" in names
+                assert "main.pyc" in names
 
         # Check patched AndroidManifest.xml
         manifest = AndroidManifest(apk.read("AndroidManifest.xml"))
@@ -426,7 +434,7 @@ def test_prepare_runtime_and_pack_runnable_kivy_apk(tmp_path: Path, capsys: pyte
     seeded_project = tmp_path / "seeded_calc"
     KivyAppHelper.init_project(seeded_project, title="Seeded App")
     assert cli_main(["prepare-runtime", "--from-apk", str(base_runtime_apk), str(seeded_project)]) == 0
-    assert (seeded_project / "lib" / "arm64-v8a" / "libpython3.10.so").exists()
+    assert (seeded_project / "lib" / "arm64-v8a" / f"libpython{py_ver}.so").exists()
     assert (seeded_project / "classes2.dex").exists()
 
     out_seeded_apk = tmp_path / "seeded_out.apk"
@@ -470,4 +478,33 @@ def test_independent_pyaxmlparser_verification(tmp_path: Path) -> None:
     finally:
         if hasattr(ext_apk, "zip") and ext_apk.zip is not None:
             ext_apk.zip.close()
+
+
+def test_kivy_pack_app_cross_version_safety(tmp_path: Path) -> None:
+    """Tests that when target python version differs from host, safe fallback to .py is maintained."""
+    base_runtime_apk = tmp_path / "cross_runtime.apk"
+    _create_mock_p4a_runtime_apk(base_runtime_apk, py_ver="3.99")
+
+    project_dir = tmp_path / "cross_project"
+    KivyAppHelper.init_project(project_dir, title="Cross Version App")
+
+    out_apk = tmp_path / "cross.apk"
+    ret = cli_main([
+        "pack-kivy",
+        str(project_dir),
+        "-o",
+        str(out_apk),
+        "--runtime-apk",
+        str(base_runtime_apk),
+    ])
+    assert ret == 0
+    with APK(out_apk) as apk:
+        tar_bytes = apk.read("assets/private.tar")
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tf:
+            names = tf.getnames()
+            assert "sitecustomize.py" in names
+            assert "main.py" in names
+            assert "sitecustomize.pyc" not in names
+            assert "main.pyc" not in names
+
 

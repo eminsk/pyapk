@@ -722,7 +722,10 @@ def _pack_framework_project(
                     tf.addfile(sc_src_ti, io.BytesIO(sc_code))
                     has_files = True
 
-                    # Add sitecustomize.pyc bytecode if compiled
+                    # Add sitecustomize.pyc bytecode if compiled or fallback to runtime template precompiled .pyc
+                    if not sc_pyc and rt_sitecustomize:
+                        sc_pyc = rt_sitecustomize
+
                     if sc_pyc:
                         sc_ti = tarfile.TarInfo(name="sitecustomize.pyc")
                         sc_ti.type = tarfile.REGTYPE

@@ -198,3 +198,60 @@ def test_cli_pack_frameworks_with_custom_package(tmp_path: Path) -> None:
     with APK(k_apk) as apk:
         assert apk.package_name == "com.custom.weather"
         assert apk.manifest.package_name == "com.custom.weather"
+
+
+def test_sitecustomize_generation_and_pyjnius_patch() -> None:
+    from pureapk.frameworks import _generate_sitecustomize_script
+    code = _generate_sitecustomize_script()
+    assert b"_pureapk_patch_pyjnius" in code
+    assert b"_JavaClass__cls_storage" in code
+    assert b"_pureapk_hook_kivy" in code
+    assert b"remove_android_splash" in code
+    assert b"safe_get_dpi" in code
+
+    user_code = b"print('custom user sitecustomize')\n"
+    merged = _generate_sitecustomize_script(user_code)
+    assert b"_pureapk_patch_pyjnius" in merged
+    assert b"print('custom user sitecustomize')" in merged
+
+
+def test_pack_kivy_embeds_enhanced_sitecustomize(tmp_path: Path) -> None:
+    import tarfile
+    k_dir = tmp_path / "kivy_sc_src"
+    KivyAppHelper.init_project(k_dir, title="KivySC")
+    # Simulate presence of native .so
+    lib_dir = k_dir / "lib" / "arm64-v8a"
+    lib_dir.mkdir(parents=True)
+    (lib_dir / "libpython3.10.so").write_bytes(b"\x7fELF_PY310")
+
+    k_apk = tmp_path / "kivy_sc.apk"
+    KivyAppHelper.pack_app(k_dir, k_apk, app_title="KivySC")
+    assert k_apk.exists()
+
+    with APK(k_apk) as apk:
+        assert "assets/private.tar" in apk.filenames
+        tar_bytes = apk.read("assets/private.tar")
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes), mode="r:*") as tf:
+            names = [m.name for m in tf.getmembers()]
+            assert "sitecustomize.py" in names
+            sc_f = tf.extractfile("sitecustomize.py")
+            assert sc_f is not None
+            sc_text = sc_f.read()
+            assert b"_pureapk_patch_pyjnius" in sc_text
+            assert b"_pureapk_hook_kivy" in sc_text
+
+
+def test_compile_py_bytecode_safety(tmp_path: Path) -> None:
+    from pureapk.frameworks import _compile_py_bytecode
+    py_file = tmp_path / "test.py"
+    py_file.write_text("x = 1 + 2\n", encoding="utf-8")
+    
+    # When target matches host (or None), compiling returns bytecode
+    res = _compile_py_bytecode(py_file, "test.py", target_version=None)
+    assert res is not None
+    assert len(res) > 4
+
+    # When target is nonexistent version (e.g. 2.7) and compiler cannot be found,
+    # it safely returns None rather than generating invalid host bytecode
+    res_fake = _compile_py_bytecode(py_file, "test.py", target_version="2.7")
+    assert res_fake is None

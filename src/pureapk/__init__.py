@@ -36,7 +36,7 @@ from pureapk.stores import (
 )
 from pureapk.wheels import AndroidWheelHelper
 
-__version__ = "1.12.0"
+__version__ = "1.13.0"
 __author__ = "eminsk"
 __all__ = [
     "APK",

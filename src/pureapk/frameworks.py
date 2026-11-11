@@ -239,14 +239,33 @@ def _find_python(target_version: str = "3.10") -> Optional[str]:
                 lines = [line.strip() for line in res.stdout.strip().splitlines() if line.strip() and not line.strip().startswith("warning:")]
                 if lines and os.path.exists(lines[-1]):
                     return lines[-1]
+            # Try auto-installing target python version via uv if missing
+            res_inst = subprocess.run([uv_bin, "python", "install", target_version], capture_output=True, text=True, timeout=60)
+            if res_inst.returncode == 0:
+                res = subprocess.run([uv_bin, "python", "find", target_version], capture_output=True, text=True, timeout=5)
+                if res.returncode == 0:
+                    lines = [line.strip() for line in res.stdout.strip().splitlines() if line.strip() and not line.strip().startswith("warning:")]
+                    if lines and os.path.exists(lines[-1]):
+                        return lines[-1]
         except Exception:
             pass
     p = shutil.which(f"python{target_version}")
     if p:
         return p
-    win_uv = Path.home() / "AppData" / "Roaming" / "uv" / "python" / f"cpython-{target_version}-windows-x86_64-none" / "python.exe"
-    if win_uv.exists():
-        return str(win_uv)
+    # Check Windows uv directory
+    win_uv = Path.home() / "AppData" / "Roaming" / "uv" / "python"
+    if win_uv.is_dir():
+        for cand in win_uv.glob(f"*cpython-{target_version}*"):
+            exe = cand / "python.exe"
+            if exe.exists():
+                return str(exe)
+    # Check Posix uv directory
+    posix_uv = Path.home() / ".local" / "share" / "uv" / "python"
+    if posix_uv.is_dir():
+        for cand in posix_uv.glob(f"*cpython-{target_version}*"):
+            exe = cand / "bin" / "python3"
+            if exe.exists():
+                return str(exe)
     return None
 
 
@@ -283,6 +302,11 @@ def _compile_py_bytecode(full_path: Path, filename: str, target_version: Optiona
                     os.unlink(tmp_path)
             except Exception:
                 pass
+        # CRITICAL: If target version differs from host but matching compiler was not found or failed,
+        # DO NOT fallback to host compilation. Host compilation produces bytecode with the wrong magic number,
+        # crashing Android runtime with "Bad magic number in .pyc file".
+        # Returning None ensures the raw .py file is used instead, which Python compiles on device cleanly.
+        return None
 
     try:
         import importlib._bootstrap_external
@@ -290,6 +314,130 @@ def _compile_py_bytecode(full_path: Path, filename: str, target_version: Optiona
         return importlib._bootstrap_external._code_to_timestamp_pyc(code_obj)
     except Exception:
         return None
+
+
+def _generate_sitecustomize_script(user_script: Optional[bytes] = None) -> bytes:
+    """Generates an enhanced sitecustomize.py with PyJNIus Cython 3 compatibility and Kivy runtime safety."""
+    bootstrap = b'''# -*- coding: utf-8 -*-
+"""pureapk runtime bootstrap: sys.path, PyJNIus Cython 3 compatibility, and Kivy crash prevention."""
+import os
+import sys
+
+# 1. Add _applibs directory to sys.path if present
+_applibs = os.path.join(os.path.dirname(__file__), "_applibs")
+if os.path.isdir(_applibs) and _applibs not in sys.path:
+    sys.path.append(_applibs)
+
+
+# 2. PyJNIus Cython 3 compatibility patch (_JavaClass__cls_storage)
+def _pureapk_patch_pyjnius():
+    try:
+        import jnius
+        import jnius.jnius as _jj
+
+        orig_resolve = _jj.MetaJavaClass.resolve_class
+        @classmethod
+        def _patched_resolve(meta, classDict):
+            orig_resolve(classDict)
+            if "__cls_storage" in classDict:
+                classDict["_JavaClass__cls_storage"] = classDict["__cls_storage"]
+        _jj.MetaJavaClass.resolve_class = _patched_resolve
+
+        orig_new = _jj.MetaJavaClass.__new__
+        def _patched_new(meta, classname, bases, classDict, classparams=(True, True)):
+            if "__cls_storage" in classDict:
+                classDict["_JavaClass__cls_storage"] = classDict["__cls_storage"]
+            tp = orig_new(meta, classname, bases, classDict, classparams)
+            if hasattr(tp, "__cls_storage"):
+                try:
+                    setattr(tp, "_JavaClass__cls_storage", getattr(tp, "__cls_storage"))
+                except Exception:
+                    pass
+            return tp
+        _jj.MetaJavaClass.__new__ = _patched_new
+
+        try:
+            import jnius.reflect as _jr
+            for mod in (_jr, jnius, _jj):
+                for k, obj in list(vars(mod).items()):
+                    if hasattr(obj, "__cls_storage"):
+                        try:
+                            setattr(obj, "_JavaClass__cls_storage", getattr(obj, "__cls_storage"))
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+_pureapk_patch_pyjnius()
+
+
+# 3. Kivy EventLoop splash screen & metrics safety hooks
+def _pureapk_hook_kivy():
+    try:
+        import builtins
+        _orig_import = builtins.__import__
+
+        def _hooked_import(name, *args, **kwargs):
+            mod = _orig_import(name, *args, **kwargs)
+            if name == "kivy.base" or name.startswith("kivy.base."):
+                try:
+                    from kivy.base import EventLoopBase
+                    if not getattr(EventLoopBase, "_pureapk_splash_patched", False):
+                        orig_splash = getattr(EventLoopBase, "remove_android_splash", None)
+                        def _safe_remove_splash(self=None):
+                            try:
+                                if orig_splash:
+                                    orig_splash(self)
+                                else:
+                                    import android
+                                    if hasattr(android, "remove_presplash"):
+                                        android.remove_presplash()
+                            except Exception:
+                                pass
+                        EventLoopBase.remove_android_splash = _safe_remove_splash
+                        EventLoopBase._pureapk_splash_patched = True
+                except Exception:
+                    pass
+            elif name == "kivy.metrics" or name.startswith("kivy.metrics."):
+                try:
+                    import kivy.metrics
+                    if not getattr(kivy.metrics, "_pureapk_metrics_patched", False):
+                        orig_dpi = kivy.metrics.MetricsBase.get_dpi
+                        def _safe_get_dpi(self, force_recompute=False):
+                            try:
+                                if self._dpi is not None:
+                                    return self._dpi
+                                return orig_dpi(self, force_recompute=force_recompute)
+                            except Exception:
+                                return 320.0
+                        kivy.metrics.MetricsBase.get_dpi = _safe_get_dpi
+                        orig_fs = getattr(kivy.metrics.MetricsBase, "get_fontscale", None)
+                        def _safe_get_fs(self, force_recompute=False):
+                            try:
+                                if orig_fs:
+                                    return orig_fs(self, force_recompute=force_recompute)
+                            except Exception:
+                                pass
+                            return 1.0
+                        kivy.metrics.MetricsBase.get_fontscale = _safe_get_fs
+                        kivy.metrics._pureapk_metrics_patched = True
+                except Exception:
+                    pass
+            return mod
+
+        builtins.__import__ = _hooked_import
+    except Exception:
+        pass
+
+
+_pureapk_hook_kivy()
+'''
+    if user_script:
+        return bootstrap + b"\n\n# --- User custom sitecustomize.py ---\n" + user_script
+    return bootstrap
 
 
 def _pack_framework_project(
@@ -481,24 +629,38 @@ def _pack_framework_project(
             )
             excluded_exts = (".apk", ".aab", ".ipa", ".msix", ".dex", ".exe", ".dll", ".pyd", ".ico", ".keystore", ".jks", ".p12", ".whl")
             with tarfile.open(fileobj=tar_buf, mode="w:gz", format=tarfile.USTAR_FORMAT) as tf:
-                if rt_sitecustomize is None and has_native_so and not is_webview:
+                if has_native_so and not is_webview:
                     import tempfile
+                    user_sc_py = src / "sitecustomize.py"
+                    user_sc_bytes = user_sc_py.read_bytes() if user_sc_py.is_file() else None
+                    sc_code = _generate_sitecustomize_script(user_sc_bytes)
+
                     with tempfile.NamedTemporaryFile(suffix=".py", delete=False) as sc_tmp:
-                        sc_tmp.write(b"from os.path import join, dirname\nimport sys\nsys.path.append(join(dirname(__file__), '_applibs'))\n")
+                        sc_tmp.write(sc_code)
                         sc_tmp_path = Path(sc_tmp.name)
+                    sc_pyc = None
                     try:
-                        rt_sitecustomize = _compile_py_bytecode(sc_tmp_path, "sitecustomize.py", target_version=target_py_ver)
+                        sc_pyc = _compile_py_bytecode(sc_tmp_path, "sitecustomize.py", target_version=target_py_ver)
                     finally:
                         if sc_tmp_path.exists():
                             sc_tmp_path.unlink()
 
-                if rt_sitecustomize and not (src / "sitecustomize.pyc").exists() and not (src / "sitecustomize.py").exists():
-                    sc_ti = tarfile.TarInfo(name="sitecustomize.pyc")
-                    sc_ti.type = tarfile.REGTYPE
-                    sc_ti.size = len(rt_sitecustomize)
-                    sc_ti.mode = 0o644
-                    tf.addfile(sc_ti, io.BytesIO(rt_sitecustomize))
+                    # Add sitecustomize.py source to tar
+                    sc_src_ti = tarfile.TarInfo(name="sitecustomize.py")
+                    sc_src_ti.type = tarfile.REGTYPE
+                    sc_src_ti.size = len(sc_code)
+                    sc_src_ti.mode = 0o644
+                    tf.addfile(sc_src_ti, io.BytesIO(sc_code))
                     has_files = True
+
+                    # Add sitecustomize.pyc bytecode if compiled
+                    if sc_pyc:
+                        sc_ti = tarfile.TarInfo(name="sitecustomize.pyc")
+                        sc_ti.type = tarfile.REGTYPE
+                        sc_ti.size = len(sc_pyc)
+                        sc_ti.mode = 0o644
+                        tf.addfile(sc_ti, io.BytesIO(sc_pyc))
+                        has_files = True
 
                 for root, dirs, files in os.walk(src):
                     dirs[:] = [d for d in dirs if d not in excluded_top and not d.endswith((".dist-info", ".egg-info"))]
@@ -533,6 +695,8 @@ def _pack_framework_project(
                         ):
                             continue
                         if f.lower().endswith(excluded_exts) or f == "resources.arsc":
+                            continue
+                        if f in ("sitecustomize.py", "sitecustomize.pyc") and has_native_so and not is_webview:
                             continue
                         rel_str = rel_f.as_posix()
                         file_bytes = full_f.read_bytes()

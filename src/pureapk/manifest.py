@@ -1255,8 +1255,9 @@ class AxmlEncoder:
         app_label: Optional[str] = None,
         version_code: Optional[int] = None,
         version_name: Optional[str] = None,
+        permissions: Optional[Sequence[str]] = None,
     ) -> bytes:
-        """Patches package_name, app_label, version_code, and version_name inside a binary AXML manifest."""
+        """Patches package_name, app_label, version_code, version_name, and injects permissions into binary AXML."""
         if len(axml_bytes) < 36 or axml_bytes[:2] != b"\x03\x00":
             return axml_bytes
 
@@ -1281,6 +1282,7 @@ class AxmlEncoder:
         body = bytearray(axml_bytes[8 + sp_size :])
         pos = 0
         old_pkg: Optional[str] = None
+        perm_chunks_pos: Optional[int] = None
         while pos + 8 <= len(body):
             ct, hs, cs = struct.unpack_from("<HHI", body, pos)
             if cs < 8 or pos + cs > len(body):
@@ -1308,7 +1310,36 @@ class AxmlEncoder:
                     elif tag_name in ("application", "activity") and attr_name == "label" and app_label:
                         if a_type == TYPE_STRING and 0 <= a_data < len(strings):
                             strings[a_data] = app_label
+                if tag_name == "uses-permission" and perm_chunks_pos is None:
+                    perm_chunks_pos = pos
             pos += cs
+
+        # Inject additional uses-permission elements if provided
+        if permissions and perm_chunks_pos is not None:
+            _, _, cs_start = struct.unpack_from("<HHI", body, perm_chunks_pos)
+            end_pos = perm_chunks_pos + cs_start
+            _, _, cs_end = struct.unpack_from("<HHI", body, end_pos)
+            insert_point = end_pos + cs_end
+
+            new_chunks = bytearray()
+            for perm in permissions:
+                if perm in strings and strings.count(perm) > 1:
+                    continue
+                if perm not in strings:
+                    strings.append(perm)
+                    p_idx = len(strings) - 1
+                else:
+                    p_idx = strings.index(perm)
+
+                start_c = bytearray(body[perm_chunks_pos : perm_chunks_pos + cs_start])
+                struct.pack_into("<I", start_c, 44, p_idx)
+                struct.pack_into("<I", start_c, 52, p_idx)
+                new_chunks.extend(start_c)
+
+                end_c = bytearray(body[end_pos : end_pos + cs_end])
+                new_chunks.extend(end_c)
+
+            body[insert_point:insert_point] = new_chunks
 
         if old_pkg and package_name and old_pkg != package_name:
             for idx, s in enumerate(strings):

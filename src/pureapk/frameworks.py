@@ -1146,6 +1146,7 @@ android.permissions = INTERNET
             ver_name: Optional[str] = None
             xml_pkg: Optional[str] = None
             xml_label: Optional[str] = None
+            xml_perms: List[str] = []
             local_m = manifest_path.read_bytes() if manifest_path.exists() else b""
             if local_m and not (len(local_m) >= 4 and local_m[:2] == b"\x03\x00"):
                 txt_m = local_m.decode("utf-8", errors="ignore")
@@ -1161,8 +1162,9 @@ android.permissions = INTERNET
                 m_lb = re.search(r'android:label="([^"@][^"]*)"', txt_m)
                 if m_lb:
                     xml_label = m_lb.group(1)
+                xml_perms = re.findall(r'<uses-permission\s+[^>]*android:name="([^"]+)"', txt_m)
 
-            raw_m = local_m if local_m else (rt_manifest_bytes or b"")
+            raw_m = rt_manifest_bytes if (rt_manifest_bytes is not None and len(rt_manifest_bytes) >= 4 and rt_manifest_bytes[:2] == b"\x03\x00") else local_m
             if len(raw_m) >= 4 and raw_m[:2] == b"\x03\x00":
                 raw_m = AxmlEncoder.patch_binary_axml(
                     raw_m,
@@ -1170,6 +1172,7 @@ android.permissions = INTERNET
                     app_label=app_title or spec_title or xml_label,
                     version_code=ver_code,
                     version_name=ver_name,
+                    permissions=xml_perms,
                 )
             builder.add_bytes("AndroidManifest.xml", raw_m)
         else:

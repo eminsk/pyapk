@@ -37,11 +37,14 @@ except Exception:
 
 def get_device_info() -> Dict[str, Any]:
     """Collects runtime device and environment metadata."""
+    active_inst = getattr(CrashReporter, "_active_instance", None)
+    sess_id = getattr(active_inst, "session_id", time.strftime("%Y%m%d_%H%M%S"))
     info: Dict[str, Any] = {
         "platform": sys.platform,
         "python": platform.python_version(),
         "machine": platform.machine(),
         "is_android": IS_ANDROID,
+        "session": sess_id,
         "time": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
     if IS_ANDROID:
@@ -352,3 +355,29 @@ def make_kivy_emergency_screen(err_text: str, app_title: str = "Application") ->
         return layout
     except Exception:
         return None
+
+
+# Convenience module-level aliases and functions
+device_info = get_device_info
+
+
+def start(app_name: str = "Application") -> CrashReporter:
+    """Convenience module-level initializer."""
+    return setup_crash_reporter(app_name=app_name)
+
+
+def emit(level: str, msg: str, **extra: Any) -> None:
+    """Convenience module-level logger."""
+    CrashReporter.get_instance().emit(level, msg, **extra)
+
+
+def fatal(exc_type: Any, exc_val: Any, exc_tb: Any, where: str = "") -> None:
+    """Convenience module-level fatal crash reporter."""
+    CrashReporter.get_instance().fatal(exc_type, exc_val, exc_tb, where=where)
+
+
+def hook_kivy_logger() -> None:
+    """Convenience module-level Kivy hook."""
+    CrashReporter.get_instance().hook_kivy()
+
+

@@ -1283,6 +1283,7 @@ class AxmlEncoder:
         pos = 0
         old_pkg: Optional[str] = None
         perm_chunks_pos: Optional[int] = None
+        existing_perms: set[str] = set()
         while pos + 8 <= len(body):
             ct, hs, cs = struct.unpack_from("<HHI", body, pos)
             if cs < 8 or pos + cs > len(body):
@@ -1310,6 +1311,8 @@ class AxmlEncoder:
                     elif tag_name in ("application", "activity") and attr_name == "label" and app_label:
                         if a_type == TYPE_STRING and 0 <= a_data < len(strings):
                             strings[a_data] = app_label
+                    elif tag_name == "uses-permission" and attr_name == "name" and 0 <= a_data < len(strings):
+                        existing_perms.add(strings[a_data])
                 if tag_name == "uses-permission" and perm_chunks_pos is None:
                     perm_chunks_pos = pos
             pos += cs
@@ -1323,8 +1326,10 @@ class AxmlEncoder:
 
             new_chunks = bytearray()
             for perm in permissions:
-                if perm in strings and strings.count(perm) > 1:
+                if perm in existing_perms:
                     continue
+                existing_perms.add(perm)
+
                 if perm not in strings:
                     strings.append(perm)
                     p_idx = len(strings) - 1

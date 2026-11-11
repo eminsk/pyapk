@@ -23,6 +23,11 @@ UNCOMPRESSED_EXTS: Tuple[str, ...] = (
     ".ogg",
     ".mp3",
     ".mp4",
+    ".tar",
+    ".gz",
+    ".tgz",
+    ".zip",
+    ".apk",
 )
 
 
@@ -176,7 +181,16 @@ class APKBuilder:
                 if comp_type == zipfile.ZIP_STORED:
                     align = self._so_alignment if arc_name.endswith(".so") else self._alignment
                     info.extra = align_zip_entry(zf.fp.tell(), arc_name, info.extra, align)
-                zf.writestr(info, data)
+                try:
+                    zf.writestr(info, data)
+                except (MemoryError, Exception) as write_err:
+                    if comp_type != zipfile.ZIP_STORED:
+                        info.compress_type = zipfile.ZIP_STORED
+                        align = self._so_alignment if arc_name.endswith(".so") else self._alignment
+                        info.extra = align_zip_entry(zf.fp.tell(), arc_name, b"", align)
+                        zf.writestr(info, data)
+                    else:
+                        raise write_err
 
         if self._sign and isinstance(buf, io.BytesIO):
             from pureapk.signature import APKSigner

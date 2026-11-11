@@ -335,36 +335,61 @@ def _pureapk_patch_pyjnius():
         import jnius
         import jnius.jnius as _jj
 
-        orig_resolve = _jj.MetaJavaClass.resolve_class
-        @classmethod
-        def _patched_resolve(meta, classDict):
-            orig_resolve(classDict)
-            if "__cls_storage" in classDict:
-                classDict["_JavaClass__cls_storage"] = classDict["__cls_storage"]
-        _jj.MetaJavaClass.resolve_class = _patched_resolve
+        orig_resolve = getattr(_jj.MetaJavaClass, "resolve_class", None)
+        if orig_resolve:
+            @classmethod
+            def _patched_resolve(meta, classDict):
+                orig_resolve(classDict)
+                if "__cls_storage" in classDict:
+                    st = classDict["__cls_storage"]
+                    classDict["_JavaClass__cls_storage"] = st
+                    classDict["_Class__cls_storage"] = st
+            _jj.MetaJavaClass.resolve_class = _patched_resolve
 
-        orig_new = _jj.MetaJavaClass.__new__
-        def _patched_new(meta, classname, bases, classDict, classparams=(True, True)):
-            if "__cls_storage" in classDict:
-                classDict["_JavaClass__cls_storage"] = classDict["__cls_storage"]
-            tp = orig_new(meta, classname, bases, classDict, classparams)
-            if hasattr(tp, "__cls_storage"):
-                try:
-                    setattr(tp, "_JavaClass__cls_storage", getattr(tp, "__cls_storage"))
-                except Exception:
-                    pass
-            return tp
-        _jj.MetaJavaClass.__new__ = _patched_new
+        orig_new = getattr(_jj.MetaJavaClass, "__new__", None)
+        if orig_new:
+            def _patched_new(meta, classname, bases, classDict, classparams=(True, True)):
+                if "__cls_storage" in classDict:
+                    st = classDict["__cls_storage"]
+                    classDict["_JavaClass__cls_storage"] = st
+                    classDict["_Class__cls_storage"] = st
+                    classDict[f"_{classname}__cls_storage"] = st
+                tp = orig_new(meta, classname, bases, classDict, classparams)
+                storage = getattr(tp, "__cls_storage", None)
+                if storage is not None:
+                    for attr in ("_JavaClass__cls_storage", "_Class__cls_storage", f"_{classname}__cls_storage"):
+                        try:
+                            setattr(tp, attr, storage)
+                        except Exception:
+                            pass
+                return tp
+            _jj.MetaJavaClass.__new__ = _patched_new
+
+        # Dynamic fallback on JavaClass instance __getattr__
+        if hasattr(_jj, "JavaClass"):
+            orig_getattr = getattr(_jj.JavaClass, "__getattr__", None)
+            def _safe_getattr(self, name):
+                if "cls_storage" in name:
+                    for k in ("_JavaClass__cls_storage", "_Class__cls_storage", "__cls_storage"):
+                        val = getattr(type(self), k, None) or getattr(self, "__dict__", {}).get(k)
+                        if val is not None:
+                            return val
+                if orig_getattr:
+                    return orig_getattr(self, name)
+                raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+            _jj.JavaClass.__getattr__ = _safe_getattr
 
         try:
             import jnius.reflect as _jr
             for mod in (_jr, jnius, _jj):
                 for k, obj in list(vars(mod).items()):
                     if hasattr(obj, "__cls_storage"):
-                        try:
-                            setattr(obj, "_JavaClass__cls_storage", getattr(obj, "__cls_storage"))
-                        except Exception:
-                            pass
+                        st = getattr(obj, "__cls_storage")
+                        for attr in ("_JavaClass__cls_storage", "_Class__cls_storage", f"_{getattr(obj, '__name__', '')}__cls_storage"):
+                            try:
+                                setattr(obj, attr, st)
+                            except Exception:
+                                pass
         except Exception:
             pass
     except Exception:
@@ -404,25 +429,25 @@ def _pureapk_hook_kivy():
             elif name == "kivy.metrics" or name.startswith("kivy.metrics."):
                 try:
                     import kivy.metrics
+                    from kivy.properties import AliasProperty
                     if not getattr(kivy.metrics, "_pureapk_metrics_patched", False):
-                        orig_dpi = kivy.metrics.MetricsBase.get_dpi
-                        def _safe_get_dpi(self, force_recompute=False):
-                            try:
-                                if self._dpi is not None:
-                                    return self._dpi
-                                return orig_dpi(self, force_recompute=force_recompute)
-                            except Exception:
-                                return 320.0
+                        def _safe_get_dpi(self=None, force_recompute=False):
+                            return 320.0
+                        def _safe_get_density(self=None, force_recompute=False):
+                            return 2.0
+                        def _safe_get_fs(self=None, force_recompute=False):
+                            return 1.0
+
+                        kivy.metrics.MetricsBase.dpi = AliasProperty(_safe_get_dpi, None)
+                        kivy.metrics.MetricsBase.density = AliasProperty(_safe_get_density, None)
+                        kivy.metrics.MetricsBase.fontscale = AliasProperty(_safe_get_fs, None)
                         kivy.metrics.MetricsBase.get_dpi = _safe_get_dpi
-                        orig_fs = getattr(kivy.metrics.MetricsBase, "get_fontscale", None)
-                        def _safe_get_fs(self, force_recompute=False):
+                        kivy.metrics.MetricsBase.get_fontscale = _safe_get_fs
+                        if hasattr(kivy.metrics, "sync_pixel_scale"):
                             try:
-                                if orig_fs:
-                                    return orig_fs(self, force_recompute=force_recompute)
+                                kivy.metrics.sync_pixel_scale(320.0, 2.0, 1.0)
                             except Exception:
                                 pass
-                            return 1.0
-                        kivy.metrics.MetricsBase.get_fontscale = _safe_get_fs
                         kivy.metrics._pureapk_metrics_patched = True
                 except Exception:
                     pass

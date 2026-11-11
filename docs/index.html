@@ -471,7 +471,7 @@
   <section class="hero">
     <div class="container">
       <div class="hero-badge" data-i18n="hero-badge">
-        🚀 Версия 1.0.1 • Production / Stable • 0 Внешних Зависимостей
+        🚀 Версия 1.14.0 • Production / Stable • 0 Внешних Зависимостей
       </div>
       <h1 data-i18n="hero-title">
         Pure Python Движок для <br>
@@ -488,14 +488,14 @@
 
       <!-- Badges -->
       <div class="badges-bar">
-        <a href="https://pypi.org/project/pureapk/" target="_blank"><img src="https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.0.1" alt="PyPI"></a>
+        <a href="https://pypi.org/project/pureapk/" target="_blank"><img src="https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.14.0" alt="PyPI"></a>
         <a href="https://anaconda.org/m_n_nik/pureapk" target="_blank"><img src="https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833" alt="Conda"></a>
         <a href="https://eminsk.github.io/ppa/" target="_blank"><img src="https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat" alt="PPA"></a>
         <img src="https://img.shields.io/badge/python-3.8_--_3.16-3776AB.svg?style=flat&logo=python&logoColor=white" alt="Python">
         <img src="https://img.shields.io/badge/No--GIL-3.13t%20--%203.16t-brightgreen?style=flat" alt="No-GIL">
         <img src="https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy" alt="PyPy">
         <img src="https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat" alt="Zero Dependencies">
-        <img src="https://img.shields.io/badge/tests-70%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white" alt="Tests">
+        <img src="https://img.shields.io/badge/tests-100%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white" alt="Tests">
         <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat" alt="MIT License">
       </div>
     </div>
@@ -544,6 +544,24 @@
         <h3 data-i18n="feat-6-title">Zero-Copy & No-GIL</h3>
         <p data-i18n="feat-6-desc">Использование <code>__slots__</code> во всех классах, парсинг срезами <code>memoryview</code> и 100% подтверждённая потокобезопасность на Python 3.13t–3.16t (Free-Threaded No-GIL) и PyPy.</p>
       </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🩺</div>
+        <h3 data-i18n="feat-7-title">Телеметрия и Краш-Репортинг</h3>
+        <p data-i18n="feat-7-desc">Встроенный модуль <code>pureapk.telemetry</code>: авто-запись стек-трейса в <code>/sdcard/Download/app_crash.log</code> и визуальный экран восстановления Kivy при любых сбоях.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🚀</div>
+        <h3 data-i18n="feat-8-title">Нативный Рантайм Python 3.10</h3>
+        <p data-i18n="feat-8-desc">Команда <code>prepare-runtime</code> внедряет скомпилированные библиотеки <code>libpython3.10.so</code>, <code>libkivy.so</code>, <code>libSDL2.so</code> и Multi-DEX для превращения скелета в живой APK.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🛡️</div>
+        <h3 data-i18n="feat-9-title">Защита Оборудования Android 10+</h3>
+        <p data-i18n="feat-9-desc">Авто-патч <code>AliasProperty</code> для плотности экрана (DPI) и метаклассов PyJNIus Cython 3. Исключает падения <code>Hardware.getDPI()</code> на современных версиях Android.</p>
+      </div>
     </div>
   </section>
 
@@ -558,6 +576,8 @@
       <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('kivy')">Kivy</button>
         <button class="tab-btn" onclick="switchTab('pygame')">Pygame-CE</button>
+        <button class="tab-btn" onclick="switchTab('telemetry')">Телеметрия & Сбои</button>
+        <button class="tab-btn" onclick="switchTab('runtime')">Рантайм (prepare-runtime)</button>
         <button class="tab-btn" onclick="switchTab('flet')">Flet (Flutter)</button>
         <button class="tab-btn" onclick="switchTab('toga')">BeeWare (Toga)</button>
         <button class="tab-btn" onclick="switchTab('webview')">HTML5 WebView</button>
@@ -598,6 +618,46 @@ pureapk init-pygame space_shooter --title "Space Shooter 2D"
 
 # 2. Упаковка в Android APK (настройка ориентации landscape, OpenGL ES 2.0)
 pureapk pack-pygame space_shooter/ -o shooter.apk --release</code></pre>
+        </div>
+      </div>
+
+      <!-- Telemetry Tab -->
+      <div id="tab-telemetry" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Python Telemetry & Crash Guard</span>
+            <button class="copy-btn" onclick="copyCode('code-telemetry')">Copy</button>
+          </div>
+          <pre id="code-telemetry"><code>from pureapk.telemetry import setup_crash_reporter, get_device_info
+
+# Инициализация телеметрии в начале main.py
+reporter = setup_crash_reporter(app_name="MyMobileApp")
+
+# Метаданные платформы и оборудования (Android model, ABI, CPU)
+info = get_device_info()
+print("Device info:", info)
+
+# Автоматический перехват: при любом исключении стек пишется в
+# /sdcard/Download/app_crash.log и выводится экран аварийного копирования.
+reporter.emit("INFO", "Приложение запущено")</code></pre>
+        </div>
+      </div>
+
+      <!-- Runtime Seeding Tab -->
+      <div id="tab-runtime" class="tab-content">
+        <div class="code-window">
+          <div class="code-header">
+            <span>Prepare-Runtime CLI & Python</span>
+            <button class="copy-btn" onclick="copyCode('code-runtime')">Copy</button>
+          </div>
+          <pre id="code-runtime"><code># 1. Развернуть нативный рантайм (libpython3.10.so, classes.dex, resources.arsc)
+pureapk prepare-runtime --from-apk base_template.apk ./my_project
+
+# 2. Собрать и подписать полноценный нативный APK
+pureapk pack-kivy ./my_project -o my_app.apk --release
+
+# 3. Проверить нативную готовность к запуску на устройстве
+pureapk verify my_app.apk</code></pre>
         </div>
       </div>
 
@@ -931,6 +991,12 @@ pureapk pack-msix win_app/ -o release.msix</code></pre>
         'feat-5-desc': 'Инспекция и распаковка предсобранных .whl пакетов с раскладкой .so в lib/<abi>/. Авто-генератор GitHub Actions CI для сборки Cython NDK в облаке.',
         'feat-6-title': 'Zero-Copy & No-GIL',
         'feat-6-desc': 'Использование __slots__ во всех классах, парсинг срезами memoryview и 100% подтверждённая потокобезопасность на Python 3.13t–3.16t (Free-Threaded No-GIL) и PyPy.',
+        'feat-7-title': 'Телеметрия и Краш-Репортинг',
+        'feat-7-desc': 'Встроенный модуль pureapk.telemetry: авто-запись стек-трейса в /sdcard/Download/app_crash.log и визуальный экран восстановления Kivy при любых сбоях.',
+        'feat-8-title': 'Нативный Рантайм Python 3.10',
+        'feat-8-desc': 'Команда prepare-runtime внедряет скомпилированные библиотеки libpython3.10.so, libkivy.so, libSDL2.so и Multi-DEX для превращения скелета в живой APK.',
+        'feat-9-title': 'Защита Оборудования Android 10+',
+        'feat-9-desc': 'Авто-патч AliasProperty для плотности экрана (DPI) и метаклассов PyJNIus Cython 3. Исключает падения Hardware.getDPI() на современных версиях Android.',
         'fw-header': 'Поддержка Всех Популярных GUI Фреймворков',
         'fw-sub': 'Шаблонизация, синтез манифестов и мгновенная упаковка в APK в один клик.',
         'mod-header': 'Доработка, Моддинг и Переподпись Готовых APK',
@@ -955,7 +1021,7 @@ pureapk pack-msix win_app/ -o release.msix</code></pre>
         'nav-modding': 'APK Modding',
         'nav-cli': 'CLI Reference',
         'nav-install': 'Install',
-        'hero-badge': '🚀 Version 1.0.1 • Production / Stable • Zero External Dependencies',
+        'hero-badge': '🚀 Version 1.14.0 • Production / Stable • Zero External Dependencies',
         'hero-title': 'Pure Python Engine for <br><span class="gradient-text">Android APK & Multi-Store Packaging</span>',
         'hero-desc': 'Forget gigabytes of Android SDK, NDK, Java, and Gradle. Zero-copy memoryview parsing, native Android 15 16KB page alignment, Android Wheels extraction, and multi-store distribution to Google Play, Apple App Store, and Windows Store.',
         'feat-header': 'Why pureapk Stands Alone',
@@ -972,6 +1038,12 @@ pureapk pack-msix win_app/ -o release.msix</code></pre>
         'feat-5-desc': 'Inspect and unpack pre-built .whl packages into lib/<abi>/ and project folders. Scaffolds cloud GitHub Actions CI for Cython NDK builds.',
         'feat-6-title': 'Zero-Copy & No-GIL',
         'feat-6-desc': 'Strict __slots__ on all classes, zero-copy memoryview slicing, and 100% verified thread safety on Free-Threaded No-GIL (Python 3.13t–3.16t) & PyPy.',
+        'feat-7-title': 'Crash Telemetry & Diagnostics',
+        'feat-7-desc': 'Built-in pureapk.telemetry: automatic traceback logging to /sdcard/Download/app_crash.log and on-screen Kivy emergency recovery UI on any failure.',
+        'feat-8-title': 'Native Python 3.10 Runtime',
+        'feat-8-desc': 'prepare-runtime seeds precompiled libpython3.10.so, libkivy.so, libSDL2.so, and Multi-DEX bootstrapping to transform skeleton projects into full runnable APKs.',
+        'feat-9-title': 'Android 10+ Hardware Protection',
+        'feat-9-desc': 'Dynamic AliasProperty screen metrics and PyJNIus Cython 3 metaclass patch. Prevents Hardware.getDPI() crashes on modern Android devices.',
         'fw-header': 'First-Class Support for Python GUI Frameworks',
         'fw-sub': 'Project scaffolding, manifest synthesis, and direct one-click APK packaging.',
         'mod-header': 'Patching, Modding & Re-signing Existing APKs',

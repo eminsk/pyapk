@@ -8,7 +8,7 @@
 [ 🇬🇧 English Documentation ](https://github.com/eminsk/pyapk#readme) | [ 🇷🇺 Документация на русском ](https://github.com/eminsk/pyapk/blob/main/README_RU.md)
 
 [![GitHub Release](https://img.shields.io/github/v/release/eminsk/pyapk?logo=github&label=Release&color=0969da)](https://github.com/eminsk/pyapk/releases)
-[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.12.0)](https://pypi.org/project/pureapk/)
+[![PyPI Version](https://img.shields.io/pypi/v/pureapk?logo=pypi&logoColor=white&label=PyPI&color=0969da&v=1.14.0)](https://pypi.org/project/pureapk/)
 [![Conda Version](https://img.shields.io/conda/vn/m_n_nik/pureapk?logo=anaconda&logoColor=white&label=Conda&color=44A833)](https://anaconda.org/m_n_nik/pureapk)
 [![PyPI Downloads](https://img.shields.io/pypi/dm/pureapk.svg?style=flat&logo=pypi)](https://pypi.org/project/pureapk/)
 [![Debian / Ubuntu PPA](https://img.shields.io/badge/Debian%20%2F%20Ubuntu-APT%20PPA-E95420.svg?style=flat)](https://eminsk.github.io/ppa/)
@@ -18,7 +18,7 @@
 [![PyPy](https://img.shields.io/badge/PyPy-3.8_--_3.12-yellow.svg?style=flat&logo=pypy)](https://pypy.org/)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20external-success.svg?style=flat)](https://github.com/eminsk/pyapk)
 [![Platforms](https://img.shields.io/badge/platform-Apple_macOS_%7C_Linux_%7C_Windows-lightgrey.svg?style=flat)](https://github.com/eminsk/pyapk)
-[![Tests](https://img.shields.io/badge/tests-85%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
+[![Tests](https://img.shields.io/badge/tests-100%20passed%20(100%25)-2ea44f.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/eminsk/pyapk)
 [![CI Matrix](https://github.com/eminsk/pyapk/actions/workflows/ci.yml/badge.svg)](https://github.com/eminsk/pyapk/actions/workflows/ci.yml)
 [![GitHub Stars](https://img.shields.io/github/stars/eminsk/pyapk?style=flat&logo=github)](https://github.com/eminsk/pyapk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](https://opensource.org/licenses/MIT)
@@ -237,6 +237,58 @@ pack(
 )
 ```
 
+### 9. Built-in Crash Diagnostics & Telemetry (`pureapk.telemetry`)
+
+Silent crashes on mobile devices are difficult to diagnose. `pureapk` includes an end-to-end telemetry and diagnostics engine that is **automatically injected into every packaged Kivy and Pygame application**:
+
+```python
+from pureapk.telemetry import setup_crash_reporter, get_device_info
+
+# Initialize crash reporter at the start of main.py
+reporter = setup_crash_reporter(app_name="MyMobileApp")
+
+# Device info with platform, python version, and Android hardware metadata
+info = get_device_info()
+print("Running on device:", info)
+
+# Log events or telemetry
+reporter.emit("INFO", "Application initialized successfully")
+```
+
+#### What Happens on Crash?
+1. **Auto-Logging**: The full stack trace is immediately written to `/sdcard/Download/app_crash.log`, `/storage/emulated/0/Download/app_crash.log`, and `last_crash.txt`.
+2. **Emergency UI Screen**: Instead of abruptly closing or showing a black screen, Kivy displays a recovery view with the full traceback and a **"📋 Copy Error Log"** button so users can copy the crash report in one tap.
+3. **Kivy Logger Hook**: All `Logger.error()` and uncaught `EventLoop` exceptions are intercepted before Android kills the Activity.
+
+### 10. Native Python Runtime Seeding (`prepare-runtime`)
+
+Turn any skeleton project into a **100% self-contained runnable Android APK** with genuine Python 3.10, SDL2, and Kivy native libraries (`.so`), multi-DEX Dalvik bytecode, and compiled `resources.arsc`:
+
+```bash
+# Seed full native runtime from a base APK or runtime template
+pureapk prepare-runtime --from-apk base_runtime.apk ./my_project
+
+# Now pack and sign the complete runnable native app
+pureapk pack-kivy ./my_project -o my_app.apk --release
+```
+
+Python API:
+```python
+from pureapk.frameworks import KivyAppHelper
+
+# Seeds lib/arm64-v8a/libpython3.10.so, classes.dex, classes2.dex, and resources into the project
+stats = KivyAppHelper.prepare_runtime("base_runtime.apk", "./my_project")
+print(f"Extracted {stats['extracted_so']} native libraries and {len(stats['dex_files'])} DEX archives")
+```
+
+### 11. Android 10+ Hardware Metrics & PyJNIus Cython 3 Protection
+
+Standard Kivy applications often crash on Android 10+ due to `Hardware.getDPI()` and Cython 3 PyJNIus attribute lookups. `pureapk` transparently patches these inside the generated `sitecustomize.py`:
+- **Safe Metrics Properties**: Dynamically replaces `MetricsBase.dpi`, `density`, and `fontscale` with `AliasProperty` wrappers, preventing `AttributeError: '_JavaClass__cls_storage'` when Android queries screen density.
+- **PyJNIus Cython 3 Metaclass**: Automatically maps `__cls_storage` to `_JavaClass__cls_storage` and `_Class__cls_storage`, ensuring seamless JNI class reflection.
+- **Splash Screen Dismissal Guard**: Intercepts `EventLoopBase.remove_android_splash()` to prevent crashes during splash window handoff.
+
+
 ---
 
 ## 🎮 Supported Python GUI & Game Frameworks
@@ -448,6 +500,9 @@ pureapk extract application.apk -o output_dir/
 
 # Pack Directory to APK with 4-byte alignment
 pureapk pack src_directory/ -o output.apk
+
+# Seed Full Native Python Runtime (libpython, classes.dex, resources.arsc)
+pureapk prepare-runtime --from-apk base_runtime.apk ./my_app
 
 # Fast Framework Scaffolding & Packaging (Kivy, Pygame, Flet, Toga, Ren'Py, WebView)
 pureapk init-flet my_app --title "Flet App"

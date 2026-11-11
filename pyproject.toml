@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pureapk"
-version = "1.13.0"
+version = "1.14.0"
 description = "High-performance pure Python APK inspection, multi-store packager, and framework toolchain with zero dependencies."
 readme = "README.md"
 license = { text = "MIT" }

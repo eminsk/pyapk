@@ -34,9 +34,10 @@ from pureapk.stores import (
     ReleaseHelper,
     WindowsStoreHelper,
 )
+from pureapk.telemetry import CrashReporter, make_kivy_emergency_screen, setup_crash_reporter
 from pureapk.wheels import AndroidWheelHelper
 
-__version__ = "1.13.0"
+__version__ = "1.14.0"
 __author__ = "eminsk"
 __all__ = [
     "APK",
@@ -45,6 +46,9 @@ __all__ = [
     "pack",
     "zipalign",
     "align_zip_entry",
+    "CrashReporter",
+    "setup_crash_reporter",
+    "make_kivy_emergency_screen",
     "AndroidWheelHelper",
     "CIHelper",
     "DexHeader",

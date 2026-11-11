@@ -329,6 +329,35 @@ if os.path.isdir(_applibs) and _applibs not in sys.path:
     sys.path.append(_applibs)
 
 
+# 1.1 Automatic pureapk crash logger to /sdcard/Download/
+def _pureapk_setup_crash_logger():
+    try:
+        import traceback, time
+        _orig_hook = sys.excepthook
+        def _crash_hook(exc_type, exc_val, exc_tb):
+            tb = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
+            for path in (
+                "/sdcard/Download/app_crash.log",
+                "/storage/emulated/0/Download/app_crash.log",
+                os.path.join(os.environ.get("ANDROID_PRIVATE", "."), "last_crash.txt"),
+            ):
+                try:
+                    with open(path, "a", encoding="utf-8") as f:
+                        f.write(f"[{time.ctime()}] PUREAPK CRASH:\\n{tb}\\n")
+                except Exception:
+                    pass
+            if _orig_hook:
+                try:
+                    _orig_hook(exc_type, exc_val, exc_tb)
+                except Exception:
+                    pass
+        sys.excepthook = _crash_hook
+    except Exception:
+        pass
+
+_pureapk_setup_crash_logger()
+
+
 # 2. PyJNIus Cython 3 compatibility patch (_JavaClass__cls_storage)
 def _pureapk_patch_pyjnius():
     try:
@@ -424,6 +453,21 @@ def _pureapk_hook_kivy():
                                 pass
                         EventLoopBase.remove_android_splash = _safe_remove_splash
                         EventLoopBase._pureapk_splash_patched = True
+
+                        # Hook Kivy ExceptionManager to prevent silent crashes
+                        from kivy.base import ExceptionHandler, ExceptionManager
+                        class _SafeHandler(ExceptionHandler):
+                            def handle_exception(_self, inst):
+                                import traceback
+                                tb = traceback.format_exc()
+                                for p in ("/sdcard/Download/app_crash.log", os.path.join(os.environ.get("ANDROID_PRIVATE", "."), "last_crash.txt")):
+                                    try:
+                                        with open(p, "a", encoding="utf-8") as f:
+                                            f.write(f"KIVY EXCEPTION:\\n{tb}\\n")
+                                    except Exception:
+                                        pass
+                                return ExceptionManager.PASS
+                        ExceptionManager.add_handler(_SafeHandler())
                 except Exception:
                     pass
             elif name == "kivy.metrics" or name.startswith("kivy.metrics."):

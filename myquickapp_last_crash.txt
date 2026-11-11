@@ -1,0 +1,2 @@
+[18:16:28] [INFO] 🚀 pureapk diagnostics initialized for 'myquickapp' (session 20261111-181628)
+[18:16:28] [INFO] Process exiting cleanly (atexit)

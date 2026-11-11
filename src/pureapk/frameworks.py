@@ -1202,12 +1202,31 @@ android.permissions = INTERNET,VIBRATE
         password: str = "",
         alias: Optional[str] = None,
         runtime_apk: Optional[Union[str, Path]] = None,
+        skeleton: bool = False,
     ) -> None:
         """Packs a Pygame project directory into a standard Android APK."""
+        import re
+        import zipfile
         from pureapk.builder import APKBuilder
+        from pureapk.manifest import AxmlEncoder
         from pureapk.stores import ReleaseHelper
 
         src = Path(source_dir)
+
+        # Auto-resolve prebuilt Pygame/Python runtime if project does not already contain lib/*.so
+        if runtime_apk is None and not skeleton and os.environ.get("PUREAPK_SKELETON") != "1":
+            has_local_so = False
+            if (src / "lib").is_dir():
+                for _, _, files_l in os.walk(src / "lib"):
+                    if any(f.endswith(".so") for f in files_l):
+                        has_local_so = True
+                        break
+            if not has_local_so:
+                in_pytest = os.environ.get("PYTEST_CURRENT_TEST") is not None
+                if not in_pytest or os.environ.get("PUREAPK_AUTO_RUNTIME") == "1":
+                    resolved_rt = KivyAppHelper.ensure_runtime(download=True)
+                    if resolved_rt is not None:
+                        runtime_apk = resolved_rt
 
         spec_file = src / "buildozer.spec"
         spec_title = None

@@ -388,6 +388,7 @@ def cmd_pack_kivy(args: argparse.Namespace) -> int:
         password=getattr(args, "password", ""),
         alias=getattr(args, "alias", None),
         runtime_apk=getattr(args, "runtime_apk", None),
+        skeleton=getattr(args, "skeleton", False),
     )
     print(f"Successfully packaged Kivy APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
@@ -406,6 +407,7 @@ def cmd_pack_pygame(args: argparse.Namespace) -> int:
         password=getattr(args, "password", ""),
         alias=getattr(args, "alias", None),
         runtime_apk=getattr(args, "runtime_apk", None),
+        skeleton=getattr(args, "skeleton", False),
     )
     print(f"Successfully packaged Pygame APK ({'release' if getattr(args, 'release', False) else 'debug'}): {args.output}")
     return 0
@@ -971,6 +973,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_kivy.add_argument("--password", default="", help="Keystore password")
     p_pack_kivy.add_argument("--alias", help="Key alias in keystore")
     p_pack_kivy.add_argument("--runtime-apk", help="Path to base p4a/Kivy runtime APK or directory to bundle lib/*.so and classes*.dex")
+    p_pack_kivy.add_argument("--skeleton", action="store_true", help="Build lightweight skeleton APK without bundling native Python/Kivy runtime")
 
     # pack-pygame
     p_pack_pygame = subparsers.add_parser("pack-pygame", help="Pack a Pygame project directory into an APK")
@@ -984,6 +987,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_pack_pygame.add_argument("--password", default="", help="Keystore password")
     p_pack_pygame.add_argument("--alias", help="Key alias in keystore")
     p_pack_pygame.add_argument("--runtime-apk", help="Path to base p4a/Pygame runtime APK or directory to bundle lib/*.so and classes*.dex")
+    p_pack_pygame.add_argument("--skeleton", action="store_true", help="Build lightweight skeleton APK without bundling native Python/Pygame runtime")
 
     # init-flet
     p_init_flet = subparsers.add_parser("init-flet", help="Scaffold a Flet (Flutter/Python) mobile project")

@@ -1162,7 +1162,7 @@ android.permissions = INTERNET
                 if m_lb:
                     xml_label = m_lb.group(1)
 
-            raw_m = rt_manifest_bytes if (rt_manifest_bytes is not None and len(rt_manifest_bytes) >= 4 and rt_manifest_bytes[:2] == b"\x03\x00") else local_m
+            raw_m = local_m if local_m else (rt_manifest_bytes or b"")
             if len(raw_m) >= 4 and raw_m[:2] == b"\x03\x00":
                 raw_m = AxmlEncoder.patch_binary_axml(
                     raw_m,
